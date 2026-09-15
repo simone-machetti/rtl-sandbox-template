@@ -1,0 +1,12 @@
+# -----------------------------------------------------------------------------
+# Author: Simone Machetti
+# SPDX-License-Identifier: Apache-2.0
+# -----------------------------------------------------------------------------
+
+/projects/*/sim
+/projects/*/imp
+__pycache__
+.direnv
+.envrc
+.obsidian/
+*.lock.hjson
