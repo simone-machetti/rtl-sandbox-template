@@ -5,7 +5,7 @@ Every step of the flow consumes *views* of the same physical reality: the standa
 ## Inputs and outputs
 
 - **Consumed by**: every step. Synthesis and the STA/DPA steps read liberty (`.lib`); gate-level simulation reads behavioral Verilog cell models (`.v`); place-and-route reads liberty + LEF (`.lef`); the GDS merge reads the cell layouts (`.gds`).
-- **Provided by**: the ASAP7 platform tree, reachable as `$ASAP7_HOME` (derived by `sourceme.sh` from `PDK_HOME`).
+- **Provided by**: one ASAP7 platform tree, reachable as `$ASAP7_HOME` — derived by the Makefile as `$PDK_HOME/platforms/$PLATFORM`, `asap7` by default; `make ... PLATFORM=<name>` swaps in a technology variant with the same cell library.
 
 ## Theory
 
@@ -105,12 +105,13 @@ set_wire_rc -clock  -resistance 5.13971E-02 -capacitance 1.44549E-01
 
 ## Knobs
 
-| Knob               | Where             | Default         | Effect / tradeoff                                           |
-| ------------------ | ----------------- | --------------- | ----------------------------------------------------------- |
-| `ASAP7_HOME`       | environment       | ORFS ASAP7 tree | Selects the whole technology platform                       |
-| Liberty corner set | script file lists | RVT TT          | Analysis realism vs runtime; SS/FF needed for signoff-style |
-| VT flavors loaded  | script file lists | RVT only        | Speed vs leakage optimization space                         |
-| NLDM vs CCS        | script file lists | NLDM            | Model fidelity vs runtime                                   |
+| Knob               | Where             | Default                         | Effect / tradeoff                                           |
+| ------------------ | ----------------- | ------------------------------- | ----------------------------------------------------------- |
+| `ASAP7_HOME`       | make              | `$PDK_HOME/platforms/$PLATFORM` | Selects the whole technology platform                       |
+| `PLATFORM`         | make              | asap7                           | Platform tree under `$PDK_HOME/platforms/`                  |
+| Liberty corner set | script file lists | RVT TT                          | Analysis realism vs runtime; SS/FF needed for signoff-style |
+| VT flavors loaded  | script file lists | RVT only                        | Speed vs leakage optimization space                         |
+| NLDM vs CCS        | script file lists | NLDM                            | Model fidelity vs runtime                                   |
 
 ## Notes and caveats
 

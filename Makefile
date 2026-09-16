@@ -4,6 +4,7 @@
 # -----------------------------------------------------------------------------
 
 PROJECT            ?=
+PLATFORM           ?= asap7
 TOP_LEVEL          ?=
 TB                 ?= tb_$(TOP_LEVEL)
 OUT_DIR            ?= no_name
@@ -40,6 +41,8 @@ DROUTE_END_ITER    ?= -1
 ODB                ?= design
 
 PROJ_DIR := $(REPO_HOME)/projects/$(PROJECT)
+
+export ASAP7_HOME := $(PDK_HOME)/platforms/$(PLATFORM)
 
 export SEL_PROJECT            := $(PROJECT)
 export SEL_TOP_LEVEL          := $(TOP_LEVEL)

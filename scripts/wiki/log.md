@@ -4,6 +4,7 @@ Change history for the Learn ASIC Flow wiki — newest first. Entries are groupe
 
 ## 2026-09-16
 
+- **[Update]**: The technology tree is selectable per run: the Makefile derives `ASAP7_HOME` as `$PDK_HOME/platforms/$PLATFORM` (`asap7` by default, `PDK_HOME` being the checkout of the platform repository) and the gate-level file lists read the OA-cell models from the platform tree like the other groups — [Technology](concepts/technology.md), [Pipeline](concepts/pipeline.md), [02](steps/02_post_syn_sim.md), [12](steps/12_post_pnr_sim.md), [knobs](references/knobs.md).
 - **[Update]**: Pin placement became project-configurable: `PINS` (a project TCL of `set_io_pin_constraint` rules, sourced at floorplan after the macros are placed and kept by the checkpoints), `PIN_LAYERS_HOR/VER` (several layers per edge) and `PIN_ARGS` (extra `place_pins` flags). Documented in [06 Floorplan](steps/06_pnr_floorplan.md) with the two placer facts the files must respect (ordered groups of at most 200 pins; no re-sourcing in [07 Placement](steps/07_pnr_place.md)).
 - **[Update]**: I/O budgets for hardened blocks: `IO_DELAY_PCT` (uniform) and `SDC` (per-port additions), applied by the P&R constraints and by every STA/DPA step alike; the hierarchical page explains why a budget is the block's contract with its parent and why some deep control inputs cannot take one.
 - **[Update]**: Routability-only runs with `PNR_REPAIR=0` (stages 2–4 skip design and timing repair and the second global route) — [07](steps/07_pnr_place.md), [08](steps/08_pnr_cts.md), [09](steps/09_pnr_route.md).
