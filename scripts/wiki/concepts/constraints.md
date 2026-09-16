@@ -4,7 +4,7 @@ Constraints tell the timing engine what "fast enough" means: without them a netl
 
 ## Inputs and outputs
 
-- **Inputs**: `CLK_PERIOD_NS` (converted to ps) and `CLK_UNCERTAINTY_PS` (P&R only); the linked design's port list.
+- **Inputs**: `CLK_PERIOD_NS` (converted to ps), `IO_DELAY_PCT` and an optional project `SDC` file (every step), `CLK_UNCERTAINTY_PS` (P&R only); the linked design's port list.
 - **Outputs**: clocks and I/O constraints in the timing engine's memory (and, from P&R, the as-implemented `output/design.sdc`).
 
 ## Theory
@@ -31,6 +31,7 @@ The canonical copy, `scripts/pnr/constraints.tcl`, in full:
 
 ```tcl
 set CLK_PERIOD_PS [expr {$::env(SEL_CLK_PERIOD_NS) * 1000}]
+set IO_DELAY_PS   [expr {$CLK_PERIOD_PS * $::env(SEL_IO_DELAY_PCT) / 100.0}]
 
 if {[llength [get_ports -quiet clk_i]] > 0} {
     create_clock -name clk_i -period $CLK_PERIOD_PS [get_ports clk_i]
@@ -38,7 +39,7 @@ if {[llength [get_ports -quiet clk_i]] > 0} {
 create_clock -name vclk -period $CLK_PERIOD_PS
 ```
 
-The ns→ps conversion happens here, once ([01_technology.md](technology.md): liberty is in ps). The real clock is created **only if the port `clk_i` exists** — the flow's convention for "the clock input" — so purely combinational blocks pass through the same scripts without error (`-quiet` suppresses the not-found complaint). The **virtual clock** `vclk` is always created, same period, and serves as the reference for all I/O timing: it stands for the registers of the surrounding system that launch our inputs and capture our outputs.
+The ns→ps conversion happens here, once, and so does the I/O delay: `IO_DELAY_PCT` (default 0) as a share of the period ([01_technology.md](technology.md): liberty is in ps). The real clock is created **only if the port `clk_i` exists** — the flow's convention for "the clock input" — so purely combinational blocks pass through the same scripts without error (`-quiet` suppresses the not-found complaint). The **virtual clock** `vclk` is always created, same period, and serves as the reference for all I/O timing: it stands for the registers of the surrounding system that launch our inputs and capture our outputs.
 
 ```tcl
 set data_in {}
@@ -53,16 +54,16 @@ Collects every input port except the clock and the reset (`rst_ni` — asynchron
 
 ```tcl
 if {[llength $data_in] > 0} {
-    set_input_delay 0 -clock vclk $data_in
+    set_input_delay $IO_DELAY_PS -clock vclk $data_in
     set_false_path -hold -from $data_in
 }
 if {[llength [all_outputs]] > 0} {
-    set_output_delay 0 -clock vclk [all_outputs]
+    set_output_delay $IO_DELAY_PS -clock vclk [all_outputs]
     set_false_path -hold -to [all_outputs]
 }
 ```
 
-Zero-valued I/O delays against the virtual clock constrain **all four path classes** by exactly one clock period — the neutral choice when the integration context is unknown: it makes boundary paths visible, optimizable and reported, without asserting anything about the neighbors.
+I/O delays against the virtual clock constrain **all four path classes**. At the default of zero every boundary path gets exactly one clock period — the neutral choice when the integration context is unknown: it makes boundary paths visible, optimizable and reported, without asserting anything about the neighbors. A non-zero `IO_DELAY_PCT` is the block-level **budget**: the share of the period the outside world (a parent's wires and logic) may spend before the input pin or after the output pin, so the block must close the rest internally — the way a block to be hardened as a macro is constrained ([hierarchical.md](hierarchical.md)).
 
 The two `set_false_path -hold` lines are the subtle part. A hold check on an input path compares an **ideal-launch** edge (vclk, no clock tree, t = 0) against a **propagated-capture** edge (the real tree, ~100 ps later at the flop). The launch side's missing insertion delay makes every input path look like a hold violation of roughly the insertion delay — an artifact of the model, not of the design: any real driver sits behind its own clock tree with comparable latency. Left constrained, hold *repair* in routing chases these phantoms with delay buffers (hundreds of them, until the repair engine gives up). Block-level practice is exactly this exclusion: hold at the boundary is decided at integration time, by the parent's analysis, with real latencies on both sides. Setup on I/O paths — the meaningful part — remains fully constrained; internal register→register hold also remains fully checked and repaired.
 
@@ -74,11 +75,23 @@ if {$::env(SEL_CLK_UNCERTAINTY_PS) > 0} {
 
 Optional margin (default 0 = off), applied to all clocks so I/O and internal checks stay consistent.
 
+```tcl
+if {$::env(SEL_SDC) ne "none"} {
+    set sdc_file $::env(SEL_SDC)
+    if {[file pathtype $sdc_file] ne "absolute"} {
+        set sdc_file $::env(REPO_HOME)/$sdc_file
+    }
+    source $sdc_file
+}
+```
+
+Finally the project hook: an optional `SDC` file (repository-relative or absolute) sourced after everything above, so it can refine the generated scheme — per-port budgets that differ by port class, exceptions, whatever a design knows about its context. Because P&R sources this file from inside the checkpoint loader's procedure, the file must not rely on the script's variables; it reads the period back from the clocks it needs (`[get_property [get_clocks vclk] period]`).
+
 Two placement details of the scheme: in P&R the file is re-sourced after every checkpoint load because the ODB database does not persist SDC ([05_pnr_overview.md](../steps/05_pnr_overview.md)); and `set_propagated_clock [all_clocks]` is issued by the stages/steps that own a real clock tree — CTS onwards and the post-P&R analyses (a virtual clock cannot be propagated; the tool notes it with a benign warning).
 
 ## Design space
 
-- **Non-zero I/O budgets.** `set_input_delay 0` gives boundary paths the full period; a real integration splits the period between producer and consumer (e.g. 60/40). Making the delays a knob would let a block be pre-hardened against its planned context.
+- **I/O budgets.** `IO_DELAY_PCT` splits the period uniformly between the block and its context; the `SDC` hook splits it per port class, which is what a real block needs — a bus that reaches the first register through a multiplier can afford far less budget than an input that is registered at the pin. Deriving the classes from a zero-budget run's per-class slack, then hardening against them, is the working recipe.
 - **Real reset constraints.** `rst_ni` is left unconstrained (asynchronous); a signoff flow would add recovery/removal analysis or an explicitly false-pathed synchronized reset.
 - **Multiple clocks.** The scheme is single-clock by convention; more clocks mean more `create_clock` lines plus `set_clock_groups -asynchronous` between unrelated domains — the analysis machinery is already capable.
 - **Environment realism.** `set_driving_cell` (input slew from a real driver instead of an ideal edge) and `set_load` (output pin capacitance) are the standard next-step refinements; without them boundary timing is slightly optimistic.
@@ -87,17 +100,19 @@ Two placement details of the scheme: in P&R the file is re-sourced after every c
 
 ## Knobs
 
-| Knob                 | Where | Default | Effect / tradeoff                                                     |
-| -------------------- | ----- | ------- | --------------------------------------------------------------------- |
-| `CLK_PERIOD_NS`      | make  | 1.0     | The one timing target: every setup check, and P&R's optimization goal |
-| `CLK_UNCERTAINTY_PS` | make  | 0       | Safety margin; ↑ = more pessimism, more repair effort, more area      |
+| Knob                 | Where | Default | Effect / tradeoff                                                        |
+| -------------------- | ----- | ------- | ------------------------------------------------------------------------ |
+| `CLK_PERIOD_NS`      | make  | 1.0     | The one timing target: every setup check, and P&R's optimization goal    |
+| `CLK_UNCERTAINTY_PS` | make  | 0       | Safety margin; ↑ = more pessimism, more repair effort, more area         |
+| `IO_DELAY_PCT`       | make  | 0       | Uniform I/O budget as a share of the period (block-level hardening)      |
+| `SDC`                | make  | none    | Project constraint additions sourced last (per-port budgets, exceptions) |
 
 ## Notes and caveats
 
 - The clock port name `clk_i` is a flow-wide convention, hardcoded in the scheme; a design using another name gets treated as clockless.
 - Values are **picoseconds** in every command downstream of the one conversion.
 - The hold-false-path exclusion applies to I/O only; internal hold is fully analyzed and repaired after CTS.
-- The identical block is deliberately duplicated across the five consumer scripts (repository style favors self-contained scripts); a change to the scheme must be applied to all copies.
+- The identical block is deliberately duplicated across the five consumer scripts (repository style favors self-contained scripts); a change to the scheme must be applied to all copies — the `IO_DELAY_PCT` and `SDC` additions are present in all five.
 - P&R writes the effective constraints out as `output/design.sdc` — the ground truth of what a run was actually optimized against.
 
 ## Commercial perspective

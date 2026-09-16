@@ -70,10 +70,10 @@ Every stage begins with the three helpers. `init_tech.tcl` loads the five ASAP7 
 set TECH_LEF        $::env(ASAP7_HOME)/lef/asap7_tech_1x_201209.lef
 set SC_LEF          $::env(ASAP7_HOME)/lef/asap7sc7p5t_28_R_1x_220121a.lef
 set SITE            asap7sc7p5t
-set PIN_LAYER_HOR   M4
-set PIN_LAYER_VER   M5
+set PIN_LAYER_HOR   $::env(SEL_PIN_LAYERS_HOR)
+set PIN_LAYER_VER   $::env(SEL_PIN_LAYERS_VER)
 set MIN_ROUTE_LAYER M2
-set MAX_ROUTE_LAYER M7
+set MAX_ROUTE_LAYER $::env(SEL_MAX_ROUTE_LAYER)
 set MIN_CLK_LAYER   M4
 set TAPCELL         TAPCELL_ASAP7_75t_R
 set TIEHI_PORT      TIEHIx1_ASAP7_75t_R/H
@@ -114,13 +114,14 @@ The synthesized netlist is read (the standard `imp/<NETLIST_DIR>/output/netlist.
 # -----------------------------------------------------------------------------
 source $::env(REPO_HOME)/scripts/pnr/constraints.tcl
 source $::env(ASAP7_HOME)/setRC.tcl
+source $::env(REPO_HOME)/scripts/pnr/setRC_extra.tcl
 set_dont_use $DONT_USE
 ```
 
 Three pieces of *analysis context*, needed even at floorplan time because later stages re-derive everything from checkpoints and this stage's report already includes timing:
 
 - `constraints.tcl` creates the clock and I/O constraints from `CLK_PERIOD_NS` — the full scheme (real clock `clk_i`, virtual clock for I/O, hold false-paths) is the subject of [02_constraints.md](../concepts/constraints.md).
-- `setRC.tcl` (platform file) sets per-layer wire resistance/capacitance and the default wire RC used to *estimate* parasitics before routing exists — without it, pre-route timing would assume zero-delay wires.
+- `setRC.tcl` (platform file) sets per-layer wire resistance/capacitance and the default wire RC used to *estimate* parasitics before routing exists — without it, pre-route timing would assume zero-delay wires. `setRC_extra.tcl` adds estimates for the layers the platform file leaves out (ASAP7: M8, M9, V9, extrapolated from the M4–M7 trend), so a run with `MAX_ROUTE_LAYER=M9` prices its upper wires instead of falling back to the default.
 - `set_dont_use` blacklists cells the optimization engines may not insert or swap to: `{*x1p*_ASAP7* *xp*_ASAP7* SDF* ICG*}` — fractional-drive cells (poor repair choices), scan flops (no DFT flow), and clock gates (gating is an architectural decision; the ICGs already in the netlist are untouched and fully used). This is an engine restriction, not a netlist filter.
 
 ```tcl
@@ -173,10 +174,13 @@ The hierarchical hook: the project-owned `FLOORPLAN` file (one `place_macro -mac
 # Pin placement (provisional, refined after global placement)
 # -----------------------------------------------------------------------------
 set_pin_length -hor_length 0.24 -ver_length 0.24
-place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER
+if {$PINS_CFG ne "none"} {
+    source $PINS_CFG
+}
+place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER {*}$PIN_ARGS
 ```
 
-`place_pins` distributes every port on the core boundary: M4 shapes on the left/right edges (horizontal-direction layer), M5 on top/bottom (vertical). `set_pin_length` makes each pin a 0.24 µm-deep stub instead of a minimal square — five track-pitches of landing area for whoever routes to it; the value came out of hierarchical bring-up, where macro-pin access proved to be the fragile spot. This placement is *provisional*: ports are placed again after global placement ([07_pnr_place.md](07_pnr_place.md)) once the tool knows where each port's loads actually ended up; doing a first pass now gives the placer sane anchor positions instead of unplaced ports.
+`place_pins` distributes every port on the core boundary: by default M4 shapes on the left/right edges (horizontal-direction layer), M5 on top/bottom (vertical); `PIN_LAYERS_HOR`/`PIN_LAYERS_VER` may name several layers per direction, which doubles the pin slots of an edge (a hardened tile with a 1 000-bit bus on one edge needs it). `set_pin_length` makes each pin a 0.24 µm-deep stub instead of a minimal square — five track-pitches of landing area for whoever routes to it; the value came out of hierarchical bring-up, where macro-pin access proved to be the fragile spot. The optional project file (`PINS`) runs just before: it holds `set_io_pin_constraint` rules that pin each bus to an edge, a span of that edge and an order — the geometry a parent design will route to — and, since it is sourced after the floorplan file, it can read the placed macros to align the boundary pins with them. Two placer facts shape such files: an ordered group is kept only up to the placer's section size (200 slots), larger groups fall back to unconstrained placement, so long buses are split into ordered sub-groups with consecutive spans; and the constraints persist in the ODB, so the placement stage must not source the file again. `PIN_ARGS` passes extra flags (typically a two-track minimum pin distance and a corner avoidance). This placement is *provisional*: ports are placed again after global placement ([07_pnr_place.md](07_pnr_place.md)) once the tool knows where each port's loads actually ended up; doing a first pass now gives the placer sane anchor positions instead of unplaced ports.
 
 ```tcl
 # -----------------------------------------------------------------------------
@@ -200,7 +204,7 @@ source $PDN_CFG
 pdngen
 ```
 
-`PDN_CFG` is selected in `init_tech.tcl`: the platform's `grid_strategy-M1-M2-M5-M6.tcl` for flat runs, our `scripts/pnr/pdn_macro.tcl` when macros are present, or any file passed via the `PDN` parameter. The strategy file only *declares* the grid; `pdngen` builds it. The flat-run strategy, in full:
+`PDN_CFG` is selected in `init_tech.tcl`: the platform's `grid_strategy-M1-M2-M5-M6.tcl` for flat runs, our `scripts/pnr/pdn_macro.tcl` when macros are present, or any file passed via the `PDN` parameter — `scripts/pnr/pdn_tile.tcl` when hardening a block: rails plus a single M5 mesh exposed as M5 power pins, nothing on M6/M7, so the parent can run its own mesh and its routing over the macro. The strategy file only *declares* the grid; `pdngen` builds it. The flat-run strategy, in full:
 
 ```tcl
 add_global_connection -net {VDD} -inst_pattern {.*} -pin_pattern {^VDD$} -power
@@ -253,23 +257,25 @@ The standard stage epilogue: a timing/area snapshot into `report/1_floorplan.rpt
 
 ## Knobs
 
-| Knob               | Where             | Default   | Effect / tradeoff                                                           |
-| ------------------ | ----------------- | --------- | --------------------------------------------------------------------------- |
-| `CORE_UTIL`        | make              | 40        | Cell density; ↑ = smaller die, shorter wires ↔ congestion, less repair room |
-| `ASPECT_RATIO`     | make              | 1.0       | Core height/width; square minimizes average wire length                     |
-| `CORE_MARGIN`      | make              | 2 µm      | Core-to-die ring; room for boundary pins (and rings, if ever added)         |
-| `FLOORPLAN`        | make              | none      | Macro placement file (hierarchical runs)                                    |
-| `MACRO_DIRS`       | make              | none      | Hardened blocks to bind (hierarchical runs)                                 |
-| `PDN`              | make              | auto      | PDN strategy file override                                                  |
-| pin layers         | `init_tech.tcl`   | M4 / M5   | More layers = more pin capacity; must match parent-level routing            |
-| pin length         | `1_floorplan.tcl` | 0.24 µm   | Pin landing depth; ↑ = easier access, slightly more boundary obstruction    |
-| tap distance       | `1_floorplan.tcl` | 25 µm     | Latch-up margin vs a sliver of area                                         |
-| `cut_rows` halo    | `1_floorplan.tcl` | 1 µm      | Macro keep-out; ↑ = safer pin access, more lost placement area              |
-| PDN widths/pitches | strategy file     | see above | IR drop / EM margin vs signal-routing capacity on M5/M6                     |
+| Knob               | Where             | Default   | Effect / tradeoff                                                                      |
+| ------------------ | ----------------- | --------- | -------------------------------------------------------------------------------------- |
+| `CORE_UTIL`        | make              | 40        | Cell density; ↑ = smaller die, shorter wires ↔ congestion, less repair room            |
+| `ASPECT_RATIO`     | make              | 1.0       | Core height/width; square minimizes average wire length                                |
+| `CORE_MARGIN`      | make              | 2 µm      | Core-to-die ring; room for boundary pins (and rings, if ever added)                    |
+| `FLOORPLAN`        | make              | none      | Macro placement file (hierarchical runs)                                               |
+| `MACRO_DIRS`       | make              | none      | Hardened blocks to bind (hierarchical runs)                                            |
+| `PDN`              | make              | auto      | PDN strategy file override                                                             |
+| pin layers         | make              | M4 / M5   | `PIN_LAYERS_HOR/VER`; more layers = more pin capacity; must match parent-level routing |
+| `PINS`             | make              | none      | Project pin-constraint file: edge, span and order per bus                              |
+| `PIN_ARGS`         | make              | none      | Extra `place_pins` flags (minimum pin distance, corner avoidance)                      |
+| pin length         | `1_floorplan.tcl` | 0.24 µm   | Pin landing depth; ↑ = easier access, slightly more boundary obstruction               |
+| tap distance       | `1_floorplan.tcl` | 25 µm     | Latch-up margin vs a sliver of area                                                    |
+| `cut_rows` halo    | `1_floorplan.tcl` | 1 µm      | Macro keep-out; ↑ = safer pin access, more lost placement area                         |
+| PDN widths/pitches | strategy file     | see above | IR drop / EM margin vs signal-routing capacity on M5/M6                                |
 
 ## Notes and caveats
 
-- **The PDN macro grid must match the macro's power pins.** The platform's default macro grids connect `{M4 M5}` — written for ORFS's SRAM macros. Blocks hardened by this flow expose their **M6 straps** as power pins, so the first hierarchical run died with `PDN-0233 Failed to generate full power grid` after building an empty macro grid. The fix is `scripts/pnr/pdn_macro.tcl` (auto-selected with `MACRO_DIRS`), whose macro grid connects `{M5 M6}` — top-level M5 straps dropped straight onto the block's M6 pins.
+- **The PDN macro grid must match the macro's power pins.** The platform's default macro grids connect `{M4 M5}` — written for ORFS's SRAM macros. Blocks hardened by this flow (`MAX_ROUTE_LAYER=M5` with `pdn_tile.tcl`) expose their **M5 straps** as power pins and nothing on M6/M7, so the platform's macro grid finds no shapes and `pdngen` aborts with `PDN-0233 Failed to generate full power grid`. The fix is `scripts/pnr/pdn_macro.tcl` (auto-selected with `MACRO_DIRS`): its M6 mesh runs over the whole core, macros included, and its macro grid connects `{M5 M6}` — the parent's M6 straps dropped straight onto the block's M5 pins.
 - **Pin depth is not cosmetic.** The 0.24 µm `set_pin_length` came from debugging macro-pin access; even with it, abstract-based routing can flag `Lef58EolKeepOut` markers at a macro pin — analyzed as false positives (the "obstruction" is the same net's continuation inside the block). Full story in [18_hierarchical.md](../concepts/hierarchical.md).
 - **Utilization drifts upward through the flow**: the floorplan sets it by construction, but placement, CTS and routing repair all add buffers and up-sized cells — a few percent of growth is normal, and the knob should leave room for it.
 - **Utilization is also a power knob**: a block hardened as a macro at low utilization carries longer internal wires than the same logic implemented flat, and the switching power of those wires is a measurable overhead. Harden blocks at higher utilization when power matters.

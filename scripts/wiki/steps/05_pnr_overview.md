@@ -103,10 +103,10 @@ Directories, a benign-warning suppression, and the liberty set — plus, in hier
 set TECH_LEF        $::env(ASAP7_HOME)/lef/asap7_tech_1x_201209.lef
 set SC_LEF          $::env(ASAP7_HOME)/lef/asap7sc7p5t_28_R_1x_220121a.lef
 set SITE            asap7sc7p5t
-set PIN_LAYER_HOR   M4
-set PIN_LAYER_VER   M5
+set PIN_LAYER_HOR   $::env(SEL_PIN_LAYERS_HOR)
+set PIN_LAYER_VER   $::env(SEL_PIN_LAYERS_VER)
 set MIN_ROUTE_LAYER M2
-set MAX_ROUTE_LAYER M7
+set MAX_ROUTE_LAYER $::env(SEL_MAX_ROUTE_LAYER)
 set MIN_CLK_LAYER   M4
 set TAPCELL         TAPCELL_ASAP7_75t_R
 set TIEHI_PORT      TIEHIx1_ASAP7_75t_R/H
@@ -117,7 +117,7 @@ set FILL_CELLS      {FILLERxp5_ASAP7_75t_R FILLER_ASAP7_75t_R DECAPx1_ASAP7_75t_
 set DONT_USE        {*x1p*_ASAP7* *xp*_ASAP7* SDF* ICG*}
 ```
 
-The technology settings in one place: physical view paths, the placement site, pin and routing layer choices, and the special-cell roster (tap/tie/filler masters and the optimizer blacklist) — each choice explained in the stage document that consumes it (09 for floorplan items, 12 for routing layers).
+The technology settings in one place: physical view paths, the placement site, pin and routing layer choices, and the special-cell roster (tap/tie/filler masters and the optimizer blacklist) — each choice explained in the stage document that consumes it (06 for floorplan items, 09 for routing layers). The pin layers and the top routing layer are make parameters (`PIN_LAYERS_HOR`/`PIN_LAYERS_VER`, default M4/M5; `MAX_ROUTE_LAYER`, default M7), because a block hardened as a macro needs different values from a flat run.
 
 ```tcl
 if {$::env(SEL_PDN) ne "none"} {
@@ -128,6 +128,21 @@ if {$::env(SEL_PDN) ne "none"} {
     set PDN_CFG $::env(ASAP7_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
 }
 
+if {$::env(SEL_PINS) ne "none"} {
+    set PINS_CFG $::env(SEL_PINS)
+    if {[file pathtype $PINS_CFG] ne "absolute"} {
+        set PINS_CFG $::env(REPO_HOME)/$PINS_CFG
+    }
+} else {
+    set PINS_CFG none
+}
+
+if {$::env(SEL_PIN_ARGS) ne "none"} {
+    set PIN_ARGS $::env(SEL_PIN_ARGS)
+} else {
+    set PIN_ARGS {}
+}
+
 if {$::env(SEL_PNR_THREADS) > 0} {
     set_thread_count $::env(SEL_PNR_THREADS)
 } else {
@@ -135,7 +150,7 @@ if {$::env(SEL_PNR_THREADS) > 0} {
 }
 ```
 
-PDN strategy selection (explicit override > macro-aware default > platform default) and the thread policy: all cores unless capped. The cap matters because detailed routing's memory peak scales with its parallel workers — `PNR_THREADS` is the flow's memory/runtime dial.
+PDN strategy selection (explicit override > macro-aware default > platform default), the optional project pin-constraint file (`PINS`, resolved like the floorplan file) with extra `place_pins` flags (`PIN_ARGS`), and the thread policy: all cores unless capped. The cap matters because detailed routing's memory peak scales with its parallel workers — `PNR_THREADS` is the flow's memory/runtime dial.
 
 ### Checkpoints — `scripts/pnr/checkpoint.tcl`
 
@@ -150,11 +165,12 @@ proc load_checkpoint {tag} {
     read_db $OUT_DIR/${tag}.odb
     source $::env(REPO_HOME)/scripts/pnr/constraints.tcl
     source $::env(ASAP7_HOME)/setRC.tcl
+    source $::env(REPO_HOME)/scripts/pnr/setRC_extra.tcl
     set_dont_use $DONT_USE
 }
 ```
 
-The persistence contract in code: saving is just `write_db`; loading is `read_db` **plus the three context re-applications** — constraints ([02_constraints.md](../concepts/constraints.md)), wire RC estimates, and the optimizer blacklist — precisely the things ODB does not store. Keeping that knowledge in one proc is what makes six independent processes behave like one continuous session.
+The persistence contract in code: saving is just `write_db`; loading is `read_db` **plus the three context re-applications** — constraints ([02_constraints.md](../concepts/constraints.md)), wire RC estimates (the platform file, then `setRC_extra.tcl` for the layers it lacks — M8/M9 in ASAP7), and the optimizer blacklist — precisely the things ODB does not store. Keeping that knowledge in one proc is what makes six independent processes behave like one continuous session.
 
 ### Reports — `scripts/pnr/reports.tcl`
 
@@ -199,6 +215,7 @@ Every stage ends with the same snapshot: worst path with slews/caps, WNS, TNS, a
 | ------------- | ----- | -------- | -------------------------------------------------------------------- |
 | `PNR_STEP`    | make  | all      | Full clean run vs single-stage rerun from the previous checkpoint    |
 | `PNR_THREADS` | make  | 0 (=all) | Parallelism; fewer route threads = lower memory peak, longer runtime |
+| `PNR_REPAIR`  | make  | 1        | `0` = routability-only run: stages 2–4 skip design/timing repair     |
 | `PDN`         | make  | auto     | PDN strategy file (see selection logic above)                        |
 | `MACRO_DIRS`  | make  | none     | Hierarchical mode master switch (affects every stage's context)      |
 
@@ -213,4 +230,4 @@ Every stage ends with the same snapshot: worst path with slews/caps, WNS, TNS, a
 
 Commercial P&R (Innovus, Fusion Compiler) is one long-lived session over a proprietary database, with the same conceptual checkpoints (`saveDesign`/restore) and the same stage vocabulary. The one-process-per-stage discipline here is closer to how those tools are *scripted in production* anyway — reference flows save and restore between named steps for exactly the restartability reasons above.
 
-Source: [run.sh](../../pnr/run.sh) — [init_tech.tcl](../../pnr/init_tech.tcl) — [checkpoint.tcl](../../pnr/checkpoint.tcl) — [reports.tcl](../../pnr/reports.tcl) — Reference: [asic_flow.md](../../asic_flow.md) — Index: [index.md](../index.md)
+Source: [run.sh](../../pnr/run.sh) — [init_tech.tcl](../../pnr/init_tech.tcl) — [checkpoint.tcl](../../pnr/checkpoint.tcl) — [setRC_extra.tcl](../../pnr/setRC_extra.tcl) — [reports.tcl](../../pnr/reports.tcl) — Reference: [asic_flow.md](../../asic_flow.md) — Index: [index.md](../index.md)

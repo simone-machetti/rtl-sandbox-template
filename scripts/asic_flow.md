@@ -63,8 +63,8 @@ Static timing analysis of the synthesized netlist, ideal wires and ideal clocks 
 
 - Post-syn netlist `.v`
 - Library of cells `.lib` (Liberty)
-- Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with zero I/O delays, hold false-pathed on I/O
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required)
+- Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with I/O delays from `IO_DELAY_PCT` (default zero) or a project `SDC` file, hold false-pathed on I/O
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 
@@ -80,7 +80,7 @@ VCD-based dynamic power analysis of the synthesized netlist (`make post-syn-dpa`
 - Library of cells `.lib` (Liberty)
 - Post-syn switching activity `.vcd` (annotated onto scope `<TB>/dut`)
 - Constraints, generated inline (as in POST-SYN-STA)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 
@@ -99,7 +99,8 @@ Place-and-route from the synthesized netlist to the final layout (`make pnr`), s
 - Constraints, generated inline from `CLK_PERIOD_NS` (same scheme as the STA steps)
 - ASAP7 platform physical setup (routing tracks, PDN grid strategy, wire RC, RC extraction rules)
 - Hierarchical mode: hardened-block abstracts `.lef`/`.lib`/`.gds` (`MACRO_DIRS`) + project-owned macro-placement TCL (`FLOORPLAN`)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `CORE_UTIL`, `ASPECT_RATIO`, `CORE_MARGIN`, `PLACE_DENSITY`, `MAX_ROUTE_LAYER`, `CLK_UNCERTAINTY_PS`, `PNR_STEP`, `PNR_THREADS`, `MACRO_DIRS`, `FLOORPLAN`, `MACRO_CHANNEL`, `PDN` (optional)
+- Project-owned pin-constraint TCL (`PINS`) and constraint additions such as per-port I/O budgets (`SDC`)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `CORE_UTIL`, `ASPECT_RATIO`, `CORE_MARGIN`, `PLACE_DENSITY`, `MAX_ROUTE_LAYER`, `CLK_UNCERTAINTY_PS`, `IO_DELAY_PCT`, `SDC`, `PNR_STEP`, `PNR_THREADS`, `PNR_REPAIR`, `MACRO_DIRS`, `FLOORPLAN`, `MACRO_CHANNEL`, `MACRO_CHANNEL_Y`, `PDN`, `PINS`, `PIN_LAYERS_HOR`, `PIN_LAYERS_VER`, `PIN_ARGS` (optional)
 
 **Outputs**
 
@@ -139,7 +140,7 @@ Parasitics-accurate static timing analysis of the routed design (`make post-pnr-
 - Post-pnr parasitics `.spef`
 - Constraints, generated inline (as in POST-SYN-STA), clocks propagated
 - Hardened-block timing models `.lib` (`MACRO_DIRS`, hierarchical results)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `MACRO_DIRS` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `MACRO_DIRS`, `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 
@@ -157,7 +158,7 @@ Parasitics-accurate dynamic power analysis of the routed design (`make post-pnr-
 - Post-pnr switching activity `.vcd` (from POST-PNR-SIM)
 - Constraints, generated inline, clocks propagated
 - Hardened-block routed netlists `.v` + parasitics `.spef` (`MACRO_DIRS`, hierarchical results: the blocks are linked in full and annotated per instance, so macro internals are analyzed with real power tables)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `MACRO_DIRS` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `MACRO_DIRS`, `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 

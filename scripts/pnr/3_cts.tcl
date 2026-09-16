@@ -23,10 +23,12 @@ if {[llength [get_ports -quiet clk_i]] > 0} {
 }
 
 # -----------------------------------------------------------------------------
-# Post-CTS timing repair
+# Post-CTS timing repair; skipped in routability-only runs
 # -----------------------------------------------------------------------------
-estimate_parasitics -placement
-repair_timing -setup
+if {$::env(SEL_PNR_REPAIR) ne "0"} {
+    estimate_parasitics -placement
+    repair_timing -setup
+}
 
 # -----------------------------------------------------------------------------
 # Legalization

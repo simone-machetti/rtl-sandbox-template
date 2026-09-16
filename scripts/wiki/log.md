@@ -2,6 +2,14 @@
 
 Change history for the Learn ASIC Flow wiki — newest first. Entries are grouped by ISO-8601 date, each line `**[Action]**: description`.
 
+## 2026-09-16
+
+- **[Update]**: Pin placement became project-configurable: `PINS` (a project TCL of `set_io_pin_constraint` rules, sourced at floorplan after the macros are placed and kept by the checkpoints), `PIN_LAYERS_HOR/VER` (several layers per edge) and `PIN_ARGS` (extra `place_pins` flags). Documented in [06 Floorplan](steps/06_pnr_floorplan.md) with the two placer facts the files must respect (ordered groups of at most 200 pins; no re-sourcing in [07 Placement](steps/07_pnr_place.md)).
+- **[Update]**: I/O budgets for hardened blocks: `IO_DELAY_PCT` (uniform) and `SDC` (per-port additions), applied by the P&R constraints and by every STA/DPA step alike; the hierarchical page explains why a budget is the block's contract with its parent and why some deep control inputs cannot take one.
+- **[Update]**: Routability-only runs with `PNR_REPAIR=0` (stages 2–4 skip design and timing repair and the second global route) — [07](steps/07_pnr_place.md), [08](steps/08_pnr_cts.md), [09](steps/09_pnr_route.md).
+- **[Update]**: `MAX_ROUTE_LAYER` is a make parameter (M5 when hardening a tile, M9 for a macro parent) with `setRC_extra.tcl` supplying the M8/M9/V9 RC estimates the platform file lacks — [05](steps/05_pnr_overview.md), [09](steps/09_pnr_route.md). Separate macro channels per direction (`MACRO_CHANNEL`, `MACRO_CHANNEL_Y`).
+- **[Update]**: Corrected the tile/parent power scheme in [06 Floorplan](steps/06_pnr_floorplan.md) and [Hierarchical flow](concepts/hierarchical.md): blocks are hardened at M5 with `pdn_tile.tcl` and export **M5** power pins; the parent's M6 mesh (`pdn_macro.tcl`) runs over the macros and drops onto them. The pages previously described the earlier M6-pin scheme.
+
 ## 2026-08-07
 
 - **[Update]**: Renumbered the step pages from `00` rather than `03` — they are step indices, not global course positions, so `steps/` now runs [00 Simulation](steps/00_sim.md) → [14 Post-P&R power](steps/14_post_pnr_dpa.md). 15 files renamed; every link target, and every link label carrying a number (`[04]`, `[04 Synthesis]`, `[04_syn.md]`), rewritten with it.

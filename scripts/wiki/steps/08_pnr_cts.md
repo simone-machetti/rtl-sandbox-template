@@ -57,13 +57,15 @@ Inside: `repair_clock_inverters` normalizes inverter pairs on the clock path so 
 
 ```tcl
 # -----------------------------------------------------------------------------
-# Post-CTS timing repair
+# Post-CTS timing repair; skipped in routability-only runs
 # -----------------------------------------------------------------------------
-estimate_parasitics -placement
-repair_timing -setup
+if {$::env(SEL_PNR_REPAIR) ne "0"} {
+    estimate_parasitics -placement
+    repair_timing -setup
+}
 ```
 
-Fresh parasitics (the tree added cells and displaced others), then **setup repair**: resizing, buffering, pin-swapping and load-splitting on violating paths — the first timing repair of the flow, now that launch/capture use real clock arrivals. Hold is deliberately *not* repaired yet: hold buffers inserted against placement-estimated wires would be mis-sized; routing's real parasitics come first.
+Fresh parasitics (the tree added cells and displaced others), then **setup repair** (unless `PNR_REPAIR=0`, the routability-only mode of [07_pnr_place.md](07_pnr_place.md)): resizing, buffering, pin-swapping and load-splitting on violating paths — the first timing repair of the flow, now that launch/capture use real clock arrivals. Hold is deliberately *not* repaired yet: hold buffers inserted against placement-estimated wires would be mis-sized; routing's real parasitics come first.
 
 ```tcl
 # -----------------------------------------------------------------------------
@@ -94,6 +96,7 @@ The tree's buffers and repair's cells are legalized into the rows, the invariant
 | `CLK_UNCERTAINTY_PS` | make            | 0             | Margin available to CTS-era setup repair                     |
 | `MIN_CLK_LAYER`      | `init_tech.tcl` | M4            | Clock wires' lowest layer — RC quality of the tree's routing |
 | CTS options          | `3_cts.tcl`     | clustering on | Tree size/power vs skew fine-tuning (`-buf_list`, targets)   |
+| `PNR_REPAIR`         | make            | 1             | `0` = no setup repair after the tree (routability-only run)  |
 
 ## Notes and caveats
 

@@ -18,7 +18,7 @@ Routing is solved in two resolutions:
 
 ### Layer management
 
-Two policies shape where wires may go. The **layer window** (`set_routing_layers`) restricts signals to M2–M7: M1 belongs to cells and power rails, M8/M9 are reserved thick layers. Clocks get a *higher floor* (M4–M7): mid/upper layers have lower resistance, giving the tree lower latency and skew. The **layer adjustment** (`set_global_routing_layer_adjustment 0.25`) tells the global router to pretend 25 % of each layer's capacity doesn't exist — safety margin so its plan doesn't saturate what the detailed router (which also fights rule geometry, not just capacity) can deliver.
+Two policies shape where wires may go. The **layer window** (`set_routing_layers`) restricts signals to M2 up to `MAX_ROUTE_LAYER` (M7 by default): M1 belongs to cells and power rails; M8/M9, the thick 80 nm-pitch layers, join the window with `MAX_ROUTE_LAYER=M9` — worth it for a parent design routing over hardened macros, whose M1–M5 are blocked — priced with the RC estimates of `setRC_extra.tcl`, since the platform's RC file stops at M7. Clocks get a *higher floor* (M4–M7): mid/upper layers have lower resistance, giving the tree lower latency and skew. The **layer adjustment** (`set_global_routing_layer_adjustment 0.25`) tells the global router to pretend 25 % of each layer's capacity doesn't exist — safety margin so its plan doesn't saturate what the detailed router (which also fights rule geometry, not just capacity) can deliver.
 
 ### Timing repair with real wires
 
@@ -59,17 +59,20 @@ The two layer policies (M2–M7 signals, M4–M7 clocks, 25 % capacity haircut �
 
 ```tcl
 # -----------------------------------------------------------------------------
-# Post-route timing repair
+# Post-route timing repair (then re-route the changed netlist); skipped in
+# routability-only runs
 # -----------------------------------------------------------------------------
-estimate_parasitics -global_routing
-repair_timing -setup
-repair_timing -hold
-detailed_placement
+if {$::env(SEL_PNR_REPAIR) ne "0"} {
+    estimate_parasitics -global_routing
+    repair_timing -setup
+    repair_timing -hold
+    detailed_placement
 
-global_route -congestion_iterations 30 -verbose
+    global_route -congestion_iterations 30 -verbose
+}
 ```
 
-Parasitics from the route guides, then the two repairs in the canonical order — setup first (may resize/restructure), hold second (adds delay buffers; doing it last avoids un-fixing setup) — followed by legalization of whatever repair inserted, and a **re-route**: the netlist changed, so the global plan is rebuilt to match it. The second congestion table is the one that must be clean.
+Parasitics from the route guides, then the two repairs in the canonical order — setup first (may resize/restructure), hold second (adds delay buffers; doing it last avoids un-fixing setup) — followed by legalization of whatever repair inserted, and a **re-route**: the netlist changed, so the global plan is rebuilt to match it. The second congestion table is the one that must be clean. With `PNR_REPAIR=0` the whole block is skipped and the first global route feeds detailed routing directly.
 
 ```tcl
 # -----------------------------------------------------------------------------
@@ -98,7 +101,9 @@ TritonRoute consumes the guides and produces DRC-clean metal, iterating (`Comple
 
 | Knob                  | Where           | Default | Effect / tradeoff                                                   |
 | --------------------- | --------------- | ------- | ------------------------------------------------------------------- |
-| `MIN/MAX_ROUTE_LAYER` | `init_tech.tcl` | M2/M7   | Signal layer window: capacity vs stack cost/reservations            |
+| `MIN_ROUTE_LAYER`     | `init_tech.tcl` | M2      | Bottom of the signal layer window                                   |
+| `MAX_ROUTE_LAYER`     | make            | M7      | Top of the window: M5 when hardening a tile, M9 for a macro parent  |
+| `PNR_REPAIR`          | make            | 1       | `0` = no post-route repair and no re-route (routability-only run)   |
 | `MIN_CLK_LAYER`       | `init_tech.tcl` | M4      | Clock RC quality vs stealing upper-layer capacity                   |
 | layer adjustment      | `4_route.tcl`   | 0.25    | Global-plan safety margin: wirelength vs detailed-route convergence |
 | congestion iterations | `4_route.tcl`   | 30      | Negotiation effort on marginal designs                              |

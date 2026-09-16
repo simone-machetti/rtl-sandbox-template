@@ -30,6 +30,7 @@ link_design $::env(SEL_TOP_LEVEL)
 # -----------------------------------------------------------------------------
 source $::env(REPO_HOME)/scripts/pnr/constraints.tcl
 source $::env(ASAP7_HOME)/setRC.tcl
+source $::env(REPO_HOME)/scripts/pnr/setRC_extra.tcl
 set_dont_use $DONT_USE
 
 # -----------------------------------------------------------------------------
@@ -59,7 +60,10 @@ if {$::env(SEL_FLOORPLAN) ne "none"} {
 # Pin placement (provisional, refined after global placement)
 # -----------------------------------------------------------------------------
 set_pin_length -hor_length 0.24 -ver_length 0.24
-place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER
+if {$PINS_CFG ne "none"} {
+    source $PINS_CFG
+}
+place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER {*}$PIN_ARGS
 
 # -----------------------------------------------------------------------------
 # Tie cells & tap cells

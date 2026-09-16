@@ -13,5 +13,6 @@ proc load_checkpoint {tag} {
     read_db $OUT_DIR/${tag}.odb
     source $::env(REPO_HOME)/scripts/pnr/constraints.tcl
     source $::env(ASAP7_HOME)/setRC.tcl
+    source $::env(REPO_HOME)/scripts/pnr/setRC_extra.tcl
     set_dont_use $DONT_USE
 }

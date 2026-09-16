@@ -114,6 +114,7 @@ make post-pnr-dpa PROJECT=<project> TOP_LEVEL=<top_level> CLK_PERIOD_NS=1.0 OUT_
 │   │   ├── 6_gds.sh          # DEF-to-GDS merge (KLayout)
 │   │   ├── pdn_macro.tcl     # Macro-aware PDN strategy (hierarchical parent runs)
 │   │   ├── pdn_tile.tcl      # PDN strategy for a block hardened as a hard macro
+│   │   ├── setRC_extra.tcl   # Wire RC estimates for layers the platform file lacks (M8/M9)
 │   │   └── def2stream.py     # KLayout DEF/GDS streaming script (from ORFS)
 │   ├── post-syn-sta/         # Post-synthesis static timing analysis flow
 │   │   └── run.tcl           # OpenSTA timing analysis script
@@ -136,7 +137,7 @@ make post-pnr-dpa PROJECT=<project> TOP_LEVEL=<top_level> CLK_PERIOD_NS=1.0 OUT_
 │       ├── README.md         # Project-specific documentation
 │       ├── rtl/              # SystemVerilog source modules
 │       ├── tb/               # Verilator SV testbenches
-│       ├── scripts/          # Project-specific scripts (sweeps, floorplans; run directly)
+│       ├── scripts/          # Project-specific scripts (sweeps, floorplans, pin plans; run directly)
 │       ├── wiki/             # Design-doc wiki (Obsidian vault)
 │       ├── sim/              # Simulation outputs (generated)
 │       └── imp/              # Synthesis/P&R/STA/DPA outputs (generated)
@@ -324,28 +325,37 @@ The per-instance report needs a netlist with module boundaries, so pass the same
 ```bash
 make pnr TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir> \
     [CORE_UTIL=<pct>] [ASPECT_RATIO=<val>] [CORE_MARGIN=<um>] [PLACE_DENSITY=<val>] \
-    [MAX_ROUTE_LAYER=<layer>] [CLK_UNCERTAINTY_PS=<val>] [PNR_STEP=<stage>] [PNR_THREADS=<n>] \
-    [MACRO_DIRS="dir ..."] [FLOORPLAN=<file>] [MACRO_CHANNEL=<um>] [PDN=<file>]
+    [MAX_ROUTE_LAYER=<layer>] [CLK_UNCERTAINTY_PS=<val>] [PNR_STEP=<stage>] [PNR_THREADS=<n>] [PNR_REPAIR=0] \
+    [MACRO_DIRS="dir ..."] [FLOORPLAN=<file>] [MACRO_CHANNEL=<um>] [MACRO_CHANNEL_Y=<um>] [PDN=<file>] \
+    [PINS=<file>] [PIN_LAYERS_HOR="layer ..."] [PIN_LAYERS_VER="layer ..."] [PIN_ARGS="flags"] [IO_DELAY_PCT=<pct>] [SDC=<file>]
 ```
 
-| Parameter            | Required           | Description                                                                                                |
-| -------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `TOP_LEVEL`          | yes                | Module to place-and-route (must match the netlist top)                                                     |
-| `CLK_PERIOD_NS`      | yes                | Clock period in nanoseconds                                                                                |
-| `OUT_DIR`            | yes                | Output subdirectory under `imp/`                                                                           |
-| `NETLIST_DIR`        | yes                | Directory containing the flat netlist from `make syn`                                                      |
-| `CORE_UTIL`          | no (default: 40)   | Core utilization percentage; the die area derives from it                                                  |
-| `ASPECT_RATIO`       | no (default: 1.0)  | Core height/width ratio                                                                                    |
-| `CORE_MARGIN`        | no (default: 2)    | Core-to-die margin in µm                                                                                   |
-| `PLACE_DENSITY`      | no (default: 0.60) | Global placement target density                                                                            |
-| `MAX_ROUTE_LAYER`    | no (default: M7)   | Top signal-routing layer; use `M6` when hardening a tile so M7 stays free for the parent PDN               |
-| `CLK_UNCERTAINTY_PS` | no (default: 0)    | Clock uncertainty in picoseconds                                                                           |
-| `PNR_STEP`           | no (default: all)  | `all` = full clean run; a stage name re-runs only that stage                                               |
-| `PNR_THREADS`        | no (default: 0)    | OpenROAD thread count; `0` = all cores                                                                     |
-| `MACRO_DIRS`         | no                 | Run dirs of hardened blocks to bind as hard macros                                                         |
-| `MACRO_CHANNEL`      | no                 | Gap in µm between adjacent macros; read by the project floorplan file (wider = easier routing, larger die) |
-| `FLOORPLAN`          | no                 | Project TCL placing the macros (`place_macro` per instance)                                                |
-| `PDN`                | no                 | PDN strategy override (macro runs default to `pdn_macro.tcl`)                                              |
+| Parameter            | Required           | Description                                                                                                   |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `TOP_LEVEL`          | yes                | Module to place-and-route (must match the netlist top)                                                        |
+| `CLK_PERIOD_NS`      | yes                | Clock period in nanoseconds                                                                                   |
+| `OUT_DIR`            | yes                | Output subdirectory under `imp/`                                                                              |
+| `NETLIST_DIR`        | yes                | Directory containing the flat netlist from `make syn`                                                         |
+| `CORE_UTIL`          | no (default: 40)   | Core utilization percentage; the die area derives from it                                                     |
+| `ASPECT_RATIO`       | no (default: 1.0)  | Core height/width ratio                                                                                       |
+| `CORE_MARGIN`        | no (default: 2)    | Core-to-die margin in µm                                                                                      |
+| `PLACE_DENSITY`      | no (default: 0.60) | Global placement target density                                                                               |
+| `MAX_ROUTE_LAYER`    | no (default: M7)   | Top signal-routing layer; `M5` when hardening a tile (with the tile PDN) so M6/M7 stay free for the parent    |
+| `CLK_UNCERTAINTY_PS` | no (default: 0)    | Clock uncertainty in picoseconds                                                                              |
+| `PNR_STEP`           | no (default: all)  | `all` = full clean run; a stage name re-runs only that stage                                                  |
+| `PNR_THREADS`        | no (default: 0)    | OpenROAD thread count; `0` = all cores                                                                        |
+| `PNR_REPAIR`         | no (default: 1)    | `0` skips design and timing repair (routability-only run: no buffering/sizing, single global route)           |
+| `MACRO_DIRS`         | no                 | Run dirs of hardened blocks to bind as hard macros                                                            |
+| `MACRO_CHANNEL`      | no                 | Gap in µm between macro columns; read by the project floorplan file (wider = easier routing, larger die)      |
+| `MACRO_CHANNEL_Y`    | no                 | Gap in µm between adjacent macro rows; defaults to `MACRO_CHANNEL`                                            |
+| `FLOORPLAN`          | no                 | Project TCL placing the macros (`place_macro` per instance)                                                   |
+| `PDN`                | no                 | PDN strategy override (macro runs default to `pdn_macro.tcl`)                                                 |
+| `PINS`               | no                 | Project TCL of `set_io_pin_constraint` rules (edges, order), sourced at floorplan and kept by the checkpoints |
+| `PIN_LAYERS_HOR`     | no (default: M4)   | Pin layers for the left/right edges; a space-separated list doubles the pin slots                             |
+| `PIN_LAYERS_VER`     | no (default: M5)   | Pin layers for the top/bottom edges; a space-separated list doubles the pin slots                             |
+| `PIN_ARGS`           | no                 | Extra `place_pins` flags, e.g. `"-min_distance 2 -min_distance_in_tracks -corner_avoidance 2"`                |
+| `IO_DELAY_PCT`       | no (default: 0)    | Input/output delay on the data ports, percent of the period; set it when hardening a block for a parent       |
+| `SDC`                | no                 | Project TCL of extra constraints sourced after the generated ones (e.g. per-port I/O budgets)                 |
 
 The flow is six stages, each an independent `openroad` process chained through ODB checkpoints: `1_floorplan`, `2_place`, `3_cts`, `4_route`, `5_final`, `6_gds` (KLayout merge). ICG clock gates from synthesis are placed, routed and balanced by CTS.
 
@@ -353,9 +363,9 @@ Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`: the layout (`output/design.de
 
 #### Hierarchical place-and-route (hard macros)
 
-1. Harden each block: `make pnr TOP_LEVEL=<block> ... MAX_ROUTE_LAYER=M6` (reserve M7 for the parent's power over the macros; combinational blocks are fine — CTS skips itself).
+1. Harden each block: `make pnr TOP_LEVEL=<block> ... MAX_ROUTE_LAYER=M5 PDN=scripts/pnr/pdn_tile.tcl [PINS=<file>] [SDC=<file>]`. The block then obstructs M1–M5 only and exposes its M5 straps as power pins, leaving M6 for the parent's power mesh over the macros and M7 (and above) for its routing; `PINS` fixes which edge each bus lands on and `SDC` gives the inputs a delay budget for the parent's wires (combinational blocks are fine — CTS skips itself).
 2. Synthesize the parent with empty stubs: `make syn TOP_LEVEL=<top> BLACKBOX_MODULES="<block> ..." LINK_BLACKBOXES=0 ...`.
-3. Implement the parent: `make pnr ... MACRO_DIRS="<block_dir> ..." FLOORPLAN=<file>`, where the file places each macro (`place_macro -macro_name <inst> -location {x y} -orientation R0`).
+3. Implement the parent: `make pnr ... MACRO_DIRS="<block_dir> ..." FLOORPLAN=<file> [MACRO_CHANNEL=<um> MACRO_CHANNEL_Y=<um>] [PINS=<file>]`, where the floorplan file places each macro (`place_macro -macro_name <inst> -location {x y} -orientation R0`) and the pin file can read the placed macros to align the boundary pins with them.
 
 The `post-pnr-*` steps take the same `MACRO_DIRS`: STA uses the blocks' timing models, simulation compiles their routed netlists, and DPA analyzes the blocks in full — `power_summary.rpt` is the true total and `power_macros.rpt` breaks out each macro's in-system power. Note: `route_drc.rpt` may show a few `Lef58EolKeepOut` markers at macro pins — false positives of the abstract (the merged GDS metal is continuous there).
 
@@ -405,33 +415,41 @@ make clean-all                # remove all sim/ and imp/ directories
 
 ### Make-level parameters reference
 
-| Parameter            | Make targets                | Values                          | Description                                                                          |
-| -------------------- | --------------------------- | ------------------------------- | ------------------------------------------------------------------------------------ |
-| `PROJECT`            | all                         | project name                    | Required. Project under `projects/` to operate on (no default)                       |
-| `TOP_LEVEL`          | all except init and clean-* | module name                     | RTL module to build/simulate; can be any module in the hierarchy                     |
-| `TB`                 | sim, post-*-sim, post-*-dpa | testbench module name           | Testbench to run (default `tb_$(TOP_LEVEL)`)                                         |
-| `CLK_PERIOD_NS`      | all except init and clean-* | e.g. `1.0`                      | Clock period in nanoseconds (for `syn`: the ABC delay target, default `1.0`)         |
-| `OUT_DIR`            | all except clean-all        | directory name                  | Output subdirectory under `sim/` or `imp/`                                           |
-| `NETLIST_DIR`        | pnr, post-syn-*, post-pnr-* | e.g. `syn_top_example`          | Netlist run to consume (`make syn` for pnr/post-syn-*, `make pnr` for post-pnr-*)    |
-| `VCD_DIR`            | post-syn-dpa, post-pnr-dpa  | e.g. `sim_top_example`          | Directory containing `activity.vcd` from the matching gate-level simulation          |
-| `PARAMS`             | sim, syn, post-*-sim        | `"KEY=VAL ..."`                 | Project-specific RTL elaboration parameters                                          |
-| `VCD`                | sim, post-*-sim             | `0` (default), `1`              | Enable Verilator tracing and dump `activity.vcd`                                     |
-| `KEEP_HIERARCHY`     | syn, post-syn-dpa           | `0` (default), `1`              | Preserve module boundaries in the netlist                                            |
-| `KEEP_MODULES`       | syn, post-syn-dpa           | `"mod ..."` (default: `none`)   | Preserve only the listed module boundaries and flatten everything below them         |
-| `BLACKBOX_MODULES`   | syn, post-syn-dpa           | `"mod ..."` (default: `none`)   | Do not elaborate the listed modules; link their netlists from an earlier run         |
-| `LINK_BLACKBOXES`    | syn                         | `1` (default), `0`              | `0` keeps blackboxed modules as empty stubs for hierarchical P&R                     |
-| `CORE_UTIL`          | pnr                         | percent (default: `40`)         | Core utilization for the floorplan; die area derives from it                         |
-| `ASPECT_RATIO`       | pnr                         | ratio (default: `1.0`)          | Core height/width ratio                                                              |
-| `CORE_MARGIN`        | pnr                         | µm (default: `2`)               | Margin between core area and die edge                                                |
-| `PLACE_DENSITY`      | pnr                         | 0–1 (default: `0.60`)           | Global placement target density                                                      |
-| `MAX_ROUTE_LAYER`    | pnr                         | layer (default: `M7`)           | Top signal-routing layer; `M6` when hardening a tile reserves M7 for the parent PDN  |
-| `CLK_UNCERTAINTY_PS` | pnr                         | ps (default: `0`)               | Clock uncertainty applied to the clocks                                              |
-| `PNR_STEP`           | pnr                         | `all` (default) or a stage name | `all` = full clean run; a stage name re-runs that stage from the previous checkpoint |
-| `PNR_THREADS`        | pnr                         | `0` (default) or thread count   | OpenROAD thread count; `0` = all cores. Fewer route threads lower the memory peak    |
-| `MACRO_DIRS`         | pnr, post-pnr-*             | `"dir ..."` (default: `none`)   | Hardened-block run dirs to bind as hard macros                                       |
-| `MACRO_CHANNEL`      | pnr                         | µm (default: `10`)              | Gap between adjacent macros, used by the project floorplan file                      |
-| `FLOORPLAN`          | pnr                         | path (default: `none`)          | Project-owned macro-placement TCL sourced after the floorplan                        |
-| `PDN`                | pnr                         | path (default: `none`)          | PDN strategy override (macro runs default to `scripts/pnr/pdn_macro.tcl`)            |
+| Parameter            | Make targets                | Values                          | Description                                                                           |
+| -------------------- | --------------------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
+| `PROJECT`            | all                         | project name                    | Required. Project under `projects/` to operate on (no default)                        |
+| `TOP_LEVEL`          | all except init and clean-* | module name                     | RTL module to build/simulate; can be any module in the hierarchy                      |
+| `TB`                 | sim, post-*-sim, post-*-dpa | testbench module name           | Testbench to run (default `tb_$(TOP_LEVEL)`)                                          |
+| `CLK_PERIOD_NS`      | all except init and clean-* | e.g. `1.0`                      | Clock period in nanoseconds (for `syn`: the ABC delay target, default `1.0`)          |
+| `OUT_DIR`            | all except clean-all        | directory name                  | Output subdirectory under `sim/` or `imp/`                                            |
+| `NETLIST_DIR`        | pnr, post-syn-*, post-pnr-* | e.g. `syn_top_example`          | Netlist run to consume (`make syn` for pnr/post-syn-*, `make pnr` for post-pnr-*)     |
+| `VCD_DIR`            | post-syn-dpa, post-pnr-dpa  | e.g. `sim_top_example`          | Directory containing `activity.vcd` from the matching gate-level simulation           |
+| `PARAMS`             | sim, syn, post-*-sim        | `"KEY=VAL ..."`                 | Project-specific RTL elaboration parameters                                           |
+| `VCD`                | sim, post-*-sim             | `0` (default), `1`              | Enable Verilator tracing and dump `activity.vcd`                                      |
+| `KEEP_HIERARCHY`     | syn, post-syn-dpa           | `0` (default), `1`              | Preserve module boundaries in the netlist                                             |
+| `KEEP_MODULES`       | syn, post-syn-dpa           | `"mod ..."` (default: `none`)   | Preserve only the listed module boundaries and flatten everything below them          |
+| `BLACKBOX_MODULES`   | syn, post-syn-dpa           | `"mod ..."` (default: `none`)   | Do not elaborate the listed modules; link their netlists from an earlier run          |
+| `LINK_BLACKBOXES`    | syn                         | `1` (default), `0`              | `0` keeps blackboxed modules as empty stubs for hierarchical P&R                      |
+| `CORE_UTIL`          | pnr                         | percent (default: `40`)         | Core utilization for the floorplan; die area derives from it                          |
+| `ASPECT_RATIO`       | pnr                         | ratio (default: `1.0`)          | Core height/width ratio                                                               |
+| `CORE_MARGIN`        | pnr                         | µm (default: `2`)               | Margin between core area and die edge                                                 |
+| `PLACE_DENSITY`      | pnr                         | 0–1 (default: `0.60`)           | Global placement target density                                                       |
+| `MAX_ROUTE_LAYER`    | pnr                         | layer (default: `M7`)           | Top signal-routing layer; `M5` when hardening a tile keeps M6/M7 free for the parent  |
+| `CLK_UNCERTAINTY_PS` | pnr                         | ps (default: `0`)               | Clock uncertainty applied to the clocks                                               |
+| `PNR_STEP`           | pnr                         | `all` (default) or a stage name | `all` = full clean run; a stage name re-runs that stage from the previous checkpoint  |
+| `PNR_THREADS`        | pnr                         | `0` (default) or thread count   | OpenROAD thread count; `0` = all cores. Fewer route threads lower the memory peak     |
+| `PNR_REPAIR`         | pnr                         | `1` (default), `0`              | `0` = routability-only run: skips design/timing repair, keeps the netlist unbuffered  |
+| `MACRO_DIRS`         | pnr, post-pnr-*             | `"dir ..."` (default: `none`)   | Hardened-block run dirs to bind as hard macros                                        |
+| `MACRO_CHANNEL`      | pnr                         | µm (default: `10`)              | Gap between adjacent macro columns, used by the project floorplan file                |
+| `MACRO_CHANNEL_Y`    | pnr                         | µm (default: `MACRO_CHANNEL`)   | Gap between adjacent macro rows, used by the project floorplan file                   |
+| `FLOORPLAN`          | pnr                         | path (default: `none`)          | Project-owned macro-placement TCL sourced after the floorplan                         |
+| `PDN`                | pnr                         | path (default: `none`)          | PDN strategy override (macro runs default to `scripts/pnr/pdn_macro.tcl`)             |
+| `PINS`               | pnr                         | path (default: `none`)          | Project-owned pin-constraint TCL sourced at floorplan (kept by the checkpoints)       |
+| `PIN_LAYERS_HOR`     | pnr                         | layers (default: `M4`)          | Pin layers for the left/right edges (space-separated list allowed)                    |
+| `PIN_LAYERS_VER`     | pnr                         | layers (default: `M5`)          | Pin layers for the top/bottom edges (space-separated list allowed)                    |
+| `PIN_ARGS`           | pnr                         | flags (default: `none`)         | Extra flags passed through to `place_pins`                                            |
+| `IO_DELAY_PCT`       | pnr, post-*-sta, post-*-dpa | percent (default: `0`)          | Input/output delay on the data ports as a percentage of the period (hardening budget) |
+| `SDC`                | pnr, post-*-sta, post-*-dpa | path (default: `none`)          | Project-owned constraint additions sourced after the generated constraints            |
 
 ## License
 

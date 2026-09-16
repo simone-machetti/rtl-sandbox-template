@@ -29,8 +29,8 @@ if {$::env(SEL_MACRO_DIRS) ne "none"} {
 set TECH_LEF        $::env(ASAP7_HOME)/lef/asap7_tech_1x_201209.lef
 set SC_LEF          $::env(ASAP7_HOME)/lef/asap7sc7p5t_28_R_1x_220121a.lef
 set SITE            asap7sc7p5t
-set PIN_LAYER_HOR   M4
-set PIN_LAYER_VER   M5
+set PIN_LAYER_HOR   $::env(SEL_PIN_LAYERS_HOR)
+set PIN_LAYER_VER   $::env(SEL_PIN_LAYERS_VER)
 set MIN_ROUTE_LAYER M2
 set MAX_ROUTE_LAYER $::env(SEL_MAX_ROUTE_LAYER)
 set MIN_CLK_LAYER   M4
@@ -51,6 +51,21 @@ if {$::env(SEL_PDN) ne "none"} {
     set PDN_CFG $::env(REPO_HOME)/scripts/pnr/pdn_macro.tcl
 } else {
     set PDN_CFG $::env(ASAP7_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
+}
+
+if {$::env(SEL_PINS) ne "none"} {
+    set PINS_CFG $::env(SEL_PINS)
+    if {[file pathtype $PINS_CFG] ne "absolute"} {
+        set PINS_CFG $::env(REPO_HOME)/$PINS_CFG
+    }
+} else {
+    set PINS_CFG none
+}
+
+if {$::env(SEL_PIN_ARGS) ne "none"} {
+    set PIN_ARGS $::env(SEL_PIN_ARGS)
+} else {
+    set PIN_ARGS {}
 }
 
 if {$::env(SEL_PNR_THREADS) > 0} {

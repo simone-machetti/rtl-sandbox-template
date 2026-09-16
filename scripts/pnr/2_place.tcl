@@ -25,13 +25,15 @@ global_placement \
     -timing_driven
 
 set_pin_length -hor_length 0.24 -ver_length 0.24
-place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER
+place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER {*}$PIN_ARGS
 
 # -----------------------------------------------------------------------------
-# Design repair (buffering & sizing)
+# Design repair (buffering & sizing); skipped in routability-only runs
 # -----------------------------------------------------------------------------
-estimate_parasitics -placement
-repair_design
+if {$::env(SEL_PNR_REPAIR) ne "0"} {
+    estimate_parasitics -placement
+    repair_design
+}
 
 # -----------------------------------------------------------------------------
 # Detailed placement

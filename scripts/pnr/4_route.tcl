@@ -21,14 +21,16 @@ set_routing_layers \
 global_route -congestion_iterations 30 -verbose
 
 # -----------------------------------------------------------------------------
-# Post-route timing repair
+# Post-route timing repair; skipped in routability-only runs
 # -----------------------------------------------------------------------------
-estimate_parasitics -global_routing
-repair_timing -setup
-repair_timing -hold
-detailed_placement
+if {$::env(SEL_PNR_REPAIR) ne "0"} {
+    estimate_parasitics -global_routing
+    repair_timing -setup
+    repair_timing -hold
+    detailed_placement
 
-global_route -congestion_iterations 30 -verbose
+    global_route -congestion_iterations 30 -verbose
+}
 
 # -----------------------------------------------------------------------------
 # Detailed routing

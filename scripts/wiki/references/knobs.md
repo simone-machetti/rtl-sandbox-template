@@ -15,12 +15,14 @@ Every tunable of the flow in one place: the make-level parameters, the script-le
 
 ## Timing intent
 
-| Knob                 | Steps        | Default | Effect                                                                                                                        | Doc                                       |
-| -------------------- | ------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `CLK_PERIOD_NS`      | all but init | 1.0     | The one timing target: syn's ABC delay goal, every STA's period, P&R's optimization target. ↑ = easier closure, slower design | [constraints](../concepts/constraints.md) |
-| `CLK_UNCERTAINTY_PS` | pnr          | 0       | Margin on all checks. ↑ = more pessimism → more repair, more area/power                                                       | [constraints](../concepts/constraints.md) |
-| clock port name      | convention   | `clk_i` | Constraint generation targets it; absent = combinational treatment                                                            | [constraints](../concepts/constraints.md) |
-| I/O delays           | scheme       | 0       | Boundary paths get the full period; nonzero values would model a real integration budget                                      | [constraints](../concepts/constraints.md) |
+| Knob                 | Steps         | Default | Effect                                                                                                                        | Doc                                         |
+| -------------------- | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `CLK_PERIOD_NS`      | all but init  | 1.0     | The one timing target: syn's ABC delay goal, every STA's period, P&R's optimization target. ↑ = easier closure, slower design | [constraints](../concepts/constraints.md)   |
+| `CLK_UNCERTAINTY_PS` | pnr           | 0       | Margin on all checks. ↑ = more pessimism → more repair, more area/power                                                       | [constraints](../concepts/constraints.md)   |
+| `IO_DELAY_PCT`       | pnr, sta, dpa | 0       | Input/output delay on every data port as a share of the period — the budget a hardened block leaves its parent                | [hierarchical](../concepts/hierarchical.md) |
+| `SDC`                | pnr, sta, dpa | none    | Project constraint additions sourced after the generated ones (per-port budgets, exceptions)                                  | [hierarchical](../concepts/hierarchical.md) |
+| clock port name      | convention    | `clk_i` | Constraint generation targets it; absent = combinational treatment                                                            | [constraints](../concepts/constraints.md)   |
+| I/O delays           | scheme        | 0       | Boundary paths get the full period; nonzero values would model a real integration budget                                      | [constraints](../concepts/constraints.md)   |
 
 ## Simulation
 
@@ -46,7 +48,9 @@ Every tunable of the flow in one place: the make-level parameters, the script-le
 | `CORE_UTIL`        | make          | 40              | Die area from cell area. ↑ = smaller die, shorter wires ↔ congestion, less repair room. For blocks to be hardened: sets the macro's footprint forever | [06](../steps/06_pnr_floorplan.md)                                              |
 | `ASPECT_RATIO`     | make          | 1.0             | Core shape; square minimizes average wirelength                                                                                                       | [06](../steps/06_pnr_floorplan.md)                                              |
 | `CORE_MARGIN`      | make          | 2 µm            | Core-to-die ring for boundary pins                                                                                                                    | [06](../steps/06_pnr_floorplan.md)                                              |
-| pin layers         | script        | M4/M5           | Boundary pin capacity and parent-level compatibility                                                                                                  | [06](../steps/06_pnr_floorplan.md)                                              |
+| pin layers         | make          | M4/M5           | `PIN_LAYERS_HOR/VER`; several layers per edge multiply the pin slots; must match parent-level routing                                                 | [06](../steps/06_pnr_floorplan.md)                                              |
+| `PINS`             | make          | none            | Project pin-constraint file: edge, span and order per bus (ordered groups ≤ 200 pins; persists in the checkpoints)                                    | [06](../steps/06_pnr_floorplan.md)                                              |
+| `PIN_ARGS`         | make          | none            | Extra `place_pins` flags (minimum pin distance, corner avoidance)                                                                                     | [06](../steps/06_pnr_floorplan.md)                                              |
 | pin length         | script        | 0.24 µm         | Pin landing depth. ↑ = easier access, more boundary obstruction                                                                                       | [06](../steps/06_pnr_floorplan.md)                                              |
 | tap distance       | script        | 25 µm           | Latch-up margin ↔ a sliver of area                                                                                                                    | [06](../steps/06_pnr_floorplan.md)                                              |
 | PDN widths/pitches | strategy file | platform values | IR-drop/EM margin ↔ signal-track capacity on the strap layers                                                                                         | [06](../steps/06_pnr_floorplan.md)                                              |
@@ -70,12 +74,14 @@ Every tunable of the flow in one place: the make-level parameters, the script-le
 
 ## Routing
 
-| Knob                  | Level  | Default | Effect                                                                                       | Doc                                                               |
-| --------------------- | ------ | ------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `MIN/MAX_ROUTE_LAYER` | script | M2/M7   | Signal layer window: capacity ↔ stack cost/reservations                                      | [09](../steps/09_pnr_route.md)                                    |
-| layer adjustment      | script | 0.25    | Global-plan capacity haircut. ↑ = safer detailed routing, longer wires                       | [09](../steps/09_pnr_route.md)                                    |
-| congestion iterations | script | 30      | Negotiation effort on marginal designs                                                       | [09](../steps/09_pnr_route.md)                                    |
-| `PNR_THREADS`         | make   | 0 (all) | Parallelism. ↑ = faster routing, higher memory peak — the memory relief valve is lowering it | [05](../steps/05_pnr_overview.md), [09](../steps/09_pnr_route.md) |
+| Knob                  | Level  | Default | Effect                                                                                         | Doc                                                               |
+| --------------------- | ------ | ------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `MIN_ROUTE_LAYER`     | script | M2      | Bottom of the signal layer window                                                              | [09](../steps/09_pnr_route.md)                                    |
+| `MAX_ROUTE_LAYER`     | make   | M7      | Top of the window: M5 when hardening a tile, M9 for a macro parent (RC from `setRC_extra.tcl`) | [09](../steps/09_pnr_route.md)                                    |
+| `PNR_REPAIR`          | make   | 1       | `0` = routability-only run: no design/timing repair, single global route, unbuffered netlist   | [07](../steps/07_pnr_place.md), [09](../steps/09_pnr_route.md)    |
+| layer adjustment      | script | 0.25    | Global-plan capacity haircut. ↑ = safer detailed routing, longer wires                         | [09](../steps/09_pnr_route.md)                                    |
+| congestion iterations | script | 30      | Negotiation effort on marginal designs                                                         | [09](../steps/09_pnr_route.md)                                    |
+| `PNR_THREADS`         | make   | 0 (all) | Parallelism. ↑ = faster routing, higher memory peak — the memory relief valve is lowering it   | [05](../steps/05_pnr_overview.md), [09](../steps/09_pnr_route.md) |
 
 ## Finishing and outputs
 
@@ -87,12 +93,14 @@ Every tunable of the flow in one place: the make-level parameters, the script-le
 
 ## Hierarchical mode
 
-| Knob              | Default | Effect                                                                 | Doc                                         |
-| ----------------- | ------- | ---------------------------------------------------------------------- | ------------------------------------------- |
-| `MACRO_DIRS`      | none    | The master switch: binds hardened runs as macros in pnr and post-pnr-* | [hierarchical](../concepts/hierarchical.md) |
-| `FLOORPLAN`       | none    | The macro-placement file — where component positions are decided       | [hierarchical](../concepts/hierarchical.md) |
-| `cut_rows` halo   | 1 µm    | Macro keep-out ↔ lost placement area                                   | [hierarchical](../concepts/hierarchical.md) |
-| block `CORE_UTIL` | 40      | Hardening density: block routability ↔ parent area/power               | [hierarchical](../concepts/hierarchical.md) |
+| Knob                | Default | Effect                                                                                     | Doc                                         |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| `MACRO_DIRS`        | none    | The master switch: binds hardened runs as macros in pnr and post-pnr-*                     | [hierarchical](../concepts/hierarchical.md) |
+| `FLOORPLAN`         | none    | The macro-placement file — where component positions are decided                           | [hierarchical](../concepts/hierarchical.md) |
+| `cut_rows` halo     | 1 µm    | Macro keep-out ↔ lost placement area                                                       | [hierarchical](../concepts/hierarchical.md) |
+| block `CORE_UTIL`   | 40      | Hardening density: block routability ↔ parent area/power                                   | [hierarchical](../concepts/hierarchical.md) |
+| block layers/PDN    | M7/auto | `MAX_ROUTE_LAYER=M5` + `PDN=pdn_tile.tcl` at hardening: M5 pins, M6/M7 free for the parent | [hierarchical](../concepts/hierarchical.md) |
+| `MACRO_CHANNEL(_Y)` | 10      | Gap between macro columns / rows; wider = routable channels ↔ die area                     | [hierarchical](../concepts/hierarchical.md) |
 
 ## The classic ladders
 

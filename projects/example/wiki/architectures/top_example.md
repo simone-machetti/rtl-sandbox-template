@@ -62,7 +62,7 @@ assign out_o = out_q[0];
 ```
 
 - **Input stage** — `reg_a_i` and `reg_b_i` capture the `LANES` operands; `reg_sgn_i` captures the two signedness flags in the same cycle, so the flags always travel with the operands they qualify.
-- **Core** — `mac_n_i` is combinational; the whole multiply-and-accumulate is the single reg-to-reg path the timing reports measure. In the hierarchical run this instance is the hard macro placed by [floorplan_top_example.tcl](../../scripts/floorplan_top_example.tcl).
+- **Core** — `mac_n_i` is combinational; the whole multiply-and-accumulate is the single reg-to-reg path the timing reports measure. In the hierarchical run this instance is the hard macro placed by [floorplan_top_example.tcl](../../scripts/floorplan_top_example.tcl); its boundary pins are fixed by [pins_mac_n.tcl](../../scripts/pins_mac_n.tcl) (operands left and top, result right) and the wrapper's by [pins_top_example.tcl](../../scripts/pins_top_example.tcl) on the same edges, so the two register stages sit between the boundary and the block.
 - **Output stage** — `reg_out_i` registers the result; `out_o` is state, never a combinational path from the inputs.
 - **Latency** — a result sampled after the rising edge of cycle `t` belongs to the operands driven in cycle `t − 1`, which is how [tb_top_example](../testbenches/tb_top_example.md) aligns its golden.
 

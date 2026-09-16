@@ -58,20 +58,24 @@ global_placement \
     -timing_driven
 
 set_pin_length -hor_length 0.24 -ver_length 0.24
-place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER
+# The PINS constraints set at floorplan persist in the ODB checkpoint and are
+# reloaded with it; sourcing the file again would duplicate every pin group.
+place_pins -hor_layers $PIN_LAYER_HOR -ver_layers $PIN_LAYER_VER {*}$PIN_ARGS
 ```
 
-Global placement with both refinement modes on and the density target from the make level (default 0.60 — the platform's recommended value: 60 % maximum local occupancy). Then the **final** pin placement: the floorplan's pin pass ran before any cell had a position; now, with the placement known, `place_pins` re-optimizes every port's boundary position against where its loads actually are (pin geometry settings are per-process, hence repeated).
+Global placement with both refinement modes on and the density target from the make level (default 0.60 — the platform's recommended value: 60 % maximum local occupancy). Then the **final** pin placement: the floorplan's pin pass ran before any cell had a position; now, with the placement known, `place_pins` re-optimizes every port's boundary position against where its loads actually are (pin geometry settings are per-process, hence repeated; the `PINS` constraints are not — they live in the database and re-sourcing them makes every pin a member of two groups, which the placer rejects).
 
 ```tcl
 # -----------------------------------------------------------------------------
-# Design repair (buffering & sizing)
+# Design repair (buffering & sizing); skipped in routability-only runs
 # -----------------------------------------------------------------------------
-estimate_parasitics -placement
-repair_design
+if {$::env(SEL_PNR_REPAIR) ne "0"} {
+    estimate_parasitics -placement
+    repair_design
+}
 ```
 
-`estimate_parasitics -placement` computes every net's RC from the placed cell positions and the per-layer values of `setRC.tcl` — the best wire model available before routing. `repair_design` then fixes electrical violations net by net: buffering high-fanout and long nets, up/down-sizing drivers against real estimated loads (within the `set_dont_use` blacklist: no fractional-drive cells, no spontaneous ICGs).
+`estimate_parasitics -placement` computes every net's RC from the placed cell positions and the per-layer values of `setRC.tcl` — the best wire model available before routing. `repair_design` then fixes electrical violations net by net: buffering high-fanout and long nets, up/down-sizing drivers against real estimated loads (within the `set_dont_use` blacklist: no fractional-drive cells, no spontaneous ICGs). `PNR_REPAIR=0` skips it — and every later repair — for a *routability-only* run: the netlist stays unbuffered, which keeps a large macro assembly's routing problem to its real wires when only congestion and DRC closure are being studied.
 
 ```tcl
 # -----------------------------------------------------------------------------
@@ -97,11 +101,12 @@ Legalization of everything — including the cells repair just created — follo
 
 ## Knobs
 
-| Knob            | Where         | Default | Effect / tradeoff                                                   |
-| --------------- | ------------- | ------- | ------------------------------------------------------------------- |
-| `PLACE_DENSITY` | make          | 0.60    | Local packing; ↓ = routability, ↑ = shorter wires until congestion  |
-| pin length      | `2_place.tcl` | 0.24 µm | Boundary pin depth (kept identical to the floorplan pass)           |
-| repair limits   | tool defaults | liberty | `repair_design` honors liberty max-slew/cap/fanout — implicit knobs |
+| Knob            | Where         | Default | Effect / tradeoff                                                        |
+| --------------- | ------------- | ------- | ------------------------------------------------------------------------ |
+| `PLACE_DENSITY` | make          | 0.60    | Local packing; ↓ = routability, ↑ = shorter wires until congestion       |
+| pin length      | `2_place.tcl` | 0.24 µm | Boundary pin depth (kept identical to the floorplan pass)                |
+| repair limits   | tool defaults | liberty | `repair_design` honors liberty max-slew/cap/fanout — implicit knobs      |
+| `PNR_REPAIR`    | make          | 1       | `0` = skip design repair here and timing repair later (routability-only) |
 
 ## Notes and caveats
 

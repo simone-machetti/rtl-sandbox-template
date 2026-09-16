@@ -2,6 +2,10 @@
 
 Change history for the Example wiki — newest first. Entries are grouped by ISO-8601 date, each line `**[Action]**: description`.
 
+## 2026-09-16
+
+- **[Update]**: [Example Top](architectures/top_example.md) — the hierarchical run now fixes the boundary pins: `pins_mac_n.tcl` for the hardened `mac_n` (operands on the left and top edges, result on the right) and `pins_top_example.tcl` for the wrapper on the same edges, and the block is hardened with its routing capped at M5 and the tile PDN. The project README's walkthrough carries the commands and the refreshed reference results.
+
 ## 2026-09-14
 
 - **[Creation]**: Wiki scaffold for the template's reference project: [index.md](index.md), this log, and the `architectures/`, `modules/`, `testbenches/` folders.
