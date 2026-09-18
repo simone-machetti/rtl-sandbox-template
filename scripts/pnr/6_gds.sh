@@ -15,7 +15,7 @@ if ! command -v klayout > /dev/null; then
     exit 1
 fi
 
-TECH_LEF="${ASAP7_HOME}/lef/asap7_tech_1x_201209.lef"
+TECH_LEF="${BEOL_HOME}/lef/asap7_tech_1x_201209.lef"
 SC_LEF="${ASAP7_HOME}/lef/asap7sc7p5t_28_R_1x_220121a.lef"
 SC_GDS="${ASAP7_HOME}/gds/asap7sc7p5t_28_R_220121a.gds"
 
@@ -29,7 +29,7 @@ if [ "${SEL_MACRO_DIRS}" != "none" ]; then
 fi
 
 sed "s,<lef-files>.*</lef-files>,${LEF_FILES}," \
-    "${ASAP7_HOME}/KLayout/asap7.lyt" > "${IMP}/output/klayout.lyt"
+    "${BEOL_HOME}/KLayout/asap7.lyt" > "${IMP}/output/klayout.lyt"
 
 klayout -zz \
     -rd design_name="${SEL_TOP_LEVEL}" \

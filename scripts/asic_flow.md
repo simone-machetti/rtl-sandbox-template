@@ -1,6 +1,6 @@
 # ASIC Design Flow
 
-The complete open-source ASIC flow of this repository, step by step: the tool that implements each step, its inputs and its outputs. Every step is a `make` target (see the root [README.md](../README.md) for commands and parameters); all paths follow the repository conventions (`projects/<project>/imp|sim/<OUT_DIR>/{output,report}`). Technology: ASAP7 (7 nm predictive PDK, RVT, TT corner), block-level implementation (pins on routing layers, no pad ring, single power domain). Every technology-dependent step reads one platform tree, `ASAP7_HOME` = `$PDK_HOME/platforms/$PLATFORM` (`asap7` by default).
+The complete open-source ASIC flow of this repository, step by step: the tool that implements each step, its inputs and its outputs. Every step is a `make` target (see the root [README.md](../README.md) for commands and parameters); all paths follow the repository conventions (`projects/<project>/imp|sim/<OUT_DIR>/{output,report}`). Technology: ASAP7 (7 nm predictive PDK, RVT, TT corner), block-level implementation (pins on routing layers, no pad ring, single power domain). Every technology-dependent step reads the cell library from `ASAP7_HOME` (`$PDK_HOME/vendor/asap7`); place-and-route reads the metal stack from `BEOL_HOME`, selected with `BEOL=<name>` (`asap7` by default, the stock stack).
 
 ## SIM — Verilator
 

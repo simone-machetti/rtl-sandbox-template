@@ -4,7 +4,7 @@
 # -----------------------------------------------------------------------------
 
 PROJECT            ?=
-PLATFORM           ?= asap7
+BEOL               ?= asap7
 TOP_LEVEL          ?=
 TB                 ?= tb_$(TOP_LEVEL)
 OUT_DIR            ?= no_name
@@ -42,7 +42,8 @@ ODB                ?= design
 
 PROJ_DIR := $(REPO_HOME)/projects/$(PROJECT)
 
-export ASAP7_HOME := $(PDK_HOME)/platforms/$(PLATFORM)
+export ASAP7_HOME := $(PDK_HOME)/vendor/asap7
+export BEOL_HOME  := $(if $(filter asap7,$(BEOL)),$(ASAP7_HOME),$(PDK_HOME)/beol/$(BEOL))
 
 export SEL_PROJECT            := $(PROJECT)
 export SEL_TOP_LEVEL          := $(TOP_LEVEL)

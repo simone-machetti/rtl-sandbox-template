@@ -26,7 +26,7 @@ if {$::env(SEL_MACRO_DIRS) ne "none"} {
 # -----------------------------------------------------------------------------
 # Technology settings (ASAP7, RVT)
 # -----------------------------------------------------------------------------
-set TECH_LEF        $::env(ASAP7_HOME)/lef/asap7_tech_1x_201209.lef
+set TECH_LEF        $::env(BEOL_HOME)/lef/asap7_tech_1x_201209.lef
 set SC_LEF          $::env(ASAP7_HOME)/lef/asap7sc7p5t_28_R_1x_220121a.lef
 set SITE            asap7sc7p5t
 set PIN_LAYER_HOR   $::env(SEL_PIN_LAYERS_HOR)
@@ -50,7 +50,7 @@ if {$::env(SEL_PDN) ne "none"} {
 } elseif {$::env(SEL_MACRO_DIRS) ne "none"} {
     set PDN_CFG $::env(REPO_HOME)/scripts/pnr/pdn_macro.tcl
 } else {
-    set PDN_CFG $::env(ASAP7_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
+    set PDN_CFG $::env(BEOL_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
 }
 
 if {$::env(SEL_PINS) ne "none"} {

@@ -29,8 +29,8 @@ link_design $::env(SEL_TOP_LEVEL)
 # Constraints & wire RC
 # -----------------------------------------------------------------------------
 source $::env(REPO_HOME)/scripts/pnr/constraints.tcl
-source $::env(ASAP7_HOME)/setRC.tcl
 source $::env(REPO_HOME)/scripts/pnr/setRC_extra.tcl
+source $::env(BEOL_HOME)/setRC.tcl
 set_dont_use $DONT_USE
 
 # -----------------------------------------------------------------------------
@@ -42,7 +42,7 @@ initialize_floorplan \
     -core_space   $::env(SEL_CORE_MARGIN) \
     -site         $SITE
 
-source $::env(ASAP7_HOME)/openRoad/make_tracks.tcl
+source $::env(BEOL_HOME)/openRoad/make_tracks.tcl
 
 # -----------------------------------------------------------------------------
 # Manual macro placement (project-owned floorplan file)

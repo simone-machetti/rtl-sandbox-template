@@ -5,7 +5,7 @@ Every step of the flow consumes *views* of the same physical reality: the standa
 ## Inputs and outputs
 
 - **Consumed by**: every step. Synthesis and the STA/DPA steps read liberty (`.lib`); gate-level simulation reads behavioral Verilog cell models (`.v`); place-and-route reads liberty + LEF (`.lef`); the GDS merge reads the cell layouts (`.gds`).
-- **Provided by**: one ASAP7 platform tree, reachable as `$ASAP7_HOME` — derived by the Makefile as `$PDK_HOME/platforms/$PLATFORM`, `asap7` by default; `make ... PLATFORM=<name>` swaps in a technology variant with the same cell library.
+- **Provided by**: the vendored ASAP7 tree, reachable as `$ASAP7_HOME` (`$PDK_HOME/vendor/asap7`), for everything cell-related; the seven metal-stack files (tech LEF, tracks, PDN strategy, wire RC, extraction rules, layer map) come from `$BEOL_HOME`, which `make ... BEOL=<name>` points at `$PDK_HOME/beol/<name>`, so a variant with the same cells and a different stack is one folder of seven files.
 
 ## Theory
 
@@ -79,7 +79,7 @@ The file names encode the axes described above: `asap7sc7p5t` (7.5-track library
 LEF — in `init_tech.tcl`, consumed by stage 1:
 
 ```tcl
-set TECH_LEF        $::env(ASAP7_HOME)/lef/asap7_tech_1x_201209.lef
+set TECH_LEF        $::env(BEOL_HOME)/lef/asap7_tech_1x_201209.lef
 set SC_LEF          $::env(ASAP7_HOME)/lef/asap7sc7p5t_28_R_1x_220121a.lef
 ```
 
@@ -105,13 +105,13 @@ set_wire_rc -clock  -resistance 5.13971E-02 -capacitance 1.44549E-01
 
 ## Knobs
 
-| Knob               | Where             | Default                         | Effect / tradeoff                                           |
-| ------------------ | ----------------- | ------------------------------- | ----------------------------------------------------------- |
-| `ASAP7_HOME`       | make              | `$PDK_HOME/platforms/$PLATFORM` | Selects the whole technology platform                       |
-| `PLATFORM`         | make              | asap7                           | Platform tree under `$PDK_HOME/platforms/`                  |
-| Liberty corner set | script file lists | RVT TT                          | Analysis realism vs runtime; SS/FF needed for signoff-style |
-| VT flavors loaded  | script file lists | RVT only                        | Speed vs leakage optimization space                         |
-| NLDM vs CCS        | script file lists | NLDM                            | Model fidelity vs runtime                                   |
+| Knob               | Where             | Default                  | Effect / tradeoff                                                        |
+| ------------------ | ----------------- | ------------------------ | ------------------------------------------------------------------------ |
+| `ASAP7_HOME`       | make              | `$PDK_HOME/vendor/asap7` | The cell library: liberty, cell LEF, GDS, simulation models              |
+| `BEOL`             | make              | asap7                    | The metal stack: `$PDK_HOME/beol/<name>`, or the stock stack for `asap7` |
+| Liberty corner set | script file lists | RVT TT                   | Analysis realism vs runtime; SS/FF needed for signoff-style              |
+| VT flavors loaded  | script file lists | RVT only                 | Speed vs leakage optimization space                                      |
+| NLDM vs CCS        | script file lists | NLDM                     | Model fidelity vs runtime                                                |
 
 ## Notes and caveats
 

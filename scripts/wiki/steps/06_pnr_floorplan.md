@@ -67,7 +67,7 @@ source $::env(REPO_HOME)/scripts/pnr/reports.tcl
 Every stage begins with the three helpers. `init_tech.tcl` loads the five ASAP7 liberty files (timing models must be present before a netlist can be linked) and defines the technology variables used below — this block of it is the one the floorplan consumes:
 
 ```tcl
-set TECH_LEF        $::env(ASAP7_HOME)/lef/asap7_tech_1x_201209.lef
+set TECH_LEF        $::env(BEOL_HOME)/lef/asap7_tech_1x_201209.lef
 set SC_LEF          $::env(ASAP7_HOME)/lef/asap7sc7p5t_28_R_1x_220121a.lef
 set SITE            asap7sc7p5t
 set PIN_LAYER_HOR   $::env(SEL_PIN_LAYERS_HOR)
@@ -113,15 +113,15 @@ The synthesized netlist is read (the standard `imp/<NETLIST_DIR>/output/netlist.
 # Constraints & wire RC
 # -----------------------------------------------------------------------------
 source $::env(REPO_HOME)/scripts/pnr/constraints.tcl
-source $::env(ASAP7_HOME)/setRC.tcl
 source $::env(REPO_HOME)/scripts/pnr/setRC_extra.tcl
+source $::env(BEOL_HOME)/setRC.tcl
 set_dont_use $DONT_USE
 ```
 
 Three pieces of *analysis context*, needed even at floorplan time because later stages re-derive everything from checkpoints and this stage's report already includes timing:
 
 - `constraints.tcl` creates the clock and I/O constraints from `CLK_PERIOD_NS` — the full scheme (real clock `clk_i`, virtual clock for I/O, hold false-paths) is the subject of [02_constraints.md](../concepts/constraints.md).
-- `setRC.tcl` (platform file) sets per-layer wire resistance/capacitance and the default wire RC used to *estimate* parasitics before routing exists — without it, pre-route timing would assume zero-delay wires. `setRC_extra.tcl` adds estimates for the layers the platform file leaves out (ASAP7: M8, M9, V9, extrapolated from the M4–M7 trend), so a run with `MAX_ROUTE_LAYER=M9` prices its upper wires instead of falling back to the default.
+- `setRC.tcl` (platform file) sets per-layer wire resistance/capacitance and the default wire RC used to *estimate* parasitics before routing exists — without it, pre-route timing would assume zero-delay wires. `setRC_extra.tcl`, sourced first, adds estimates for the layers the stock file leaves out (ASAP7: M8, M9, V9, extrapolated from the M4–M7 trend), so a run with `MAX_ROUTE_LAYER=M9` prices its upper wires instead of falling back to the default; a stack whose own file covers those layers overrides them, since it is sourced last.
 - `set_dont_use` blacklists cells the optimization engines may not insert or swap to: `{*x1p*_ASAP7* *xp*_ASAP7* SDF* ICG*}` — fractional-drive cells (poor repair choices), scan flops (no DFT flow), and clock gates (gating is an architectural decision; the ICGs already in the netlist are untouched and fully used). This is an engine restriction, not a netlist filter.
 
 ```tcl
@@ -138,7 +138,7 @@ initialize_floorplan \
 The central command. From the linked design's total cell area and the three knobs it computes the core (area = cell area / utilization, shaped by the aspect ratio), adds `-core_space` (2 µm default) on each side to get the die, and fills the core with rows of the `asap7sc7p5t` site. Coordinates snap to legal grid positions — the tool logs it as, e.g., `Core area lower left (2.000, 2.000) snapped to (2.052, 2.160)`: the core corner is aligned to the site and manufacturing grids.
 
 ```tcl
-source $::env(ASAP7_HOME)/openRoad/make_tracks.tcl
+source $::env(BEOL_HOME)/openRoad/make_tracks.tcl
 ```
 
 Track definition, sourced as-is from the platform (it is pure data). Representative lines:

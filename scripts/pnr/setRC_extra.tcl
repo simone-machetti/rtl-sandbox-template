@@ -4,7 +4,8 @@
 # -----------------------------------------------------------------------------
 #
 # Pre-route wire RC estimates for the layers the platform's setRC.tcl does not
-# cover. Sourced right after it. Used by estimate_parasitics during the
+# cover. Sourced before it, so a stack whose own file covers these layers
+# overrides these values. Used by estimate_parasitics during the
 # placement- and guide-based timing repair whenever MAX_ROUTE_LAYER reaches
 # these layers; extraction (OpenRCX) has its own per-layer rules.
 #

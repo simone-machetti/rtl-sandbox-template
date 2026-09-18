@@ -56,7 +56,7 @@ check_placement -verbose
 # Parasitic extraction (OpenRCX)
 # -----------------------------------------------------------------------------
 define_process_corner -ext_model_index 0 X
-extract_parasitics -ext_model_file $::env(ASAP7_HOME)/rcx_patterns.rules
+extract_parasitics -ext_model_file $::env(BEOL_HOME)/rcx_patterns.rules
 write_spef $OUT_DIR/netlist.spef
 read_spef $OUT_DIR/netlist.spef
 ```

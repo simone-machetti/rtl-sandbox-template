@@ -100,7 +100,7 @@ if {$::env(SEL_MACRO_DIRS) ne "none"} {
 Directories, a benign-warning suppression, and the liberty set — plus, in hierarchical runs, each hardened block's timing model. Liberty is loaded in *every* stage process because timing models are not part of the ODB.
 
 ```tcl
-set TECH_LEF        $::env(ASAP7_HOME)/lef/asap7_tech_1x_201209.lef
+set TECH_LEF        $::env(BEOL_HOME)/lef/asap7_tech_1x_201209.lef
 set SC_LEF          $::env(ASAP7_HOME)/lef/asap7sc7p5t_28_R_1x_220121a.lef
 set SITE            asap7sc7p5t
 set PIN_LAYER_HOR   $::env(SEL_PIN_LAYERS_HOR)
@@ -125,7 +125,7 @@ if {$::env(SEL_PDN) ne "none"} {
 } elseif {$::env(SEL_MACRO_DIRS) ne "none"} {
     set PDN_CFG $::env(REPO_HOME)/scripts/pnr/pdn_macro.tcl
 } else {
-    set PDN_CFG $::env(ASAP7_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
+    set PDN_CFG $::env(BEOL_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
 }
 
 if {$::env(SEL_PINS) ne "none"} {
@@ -164,13 +164,13 @@ proc load_checkpoint {tag} {
     global OUT_DIR DONT_USE
     read_db $OUT_DIR/${tag}.odb
     source $::env(REPO_HOME)/scripts/pnr/constraints.tcl
-    source $::env(ASAP7_HOME)/setRC.tcl
     source $::env(REPO_HOME)/scripts/pnr/setRC_extra.tcl
+    source $::env(BEOL_HOME)/setRC.tcl
     set_dont_use $DONT_USE
 }
 ```
 
-The persistence contract in code: saving is just `write_db`; loading is `read_db` **plus the three context re-applications** — constraints ([02_constraints.md](../concepts/constraints.md)), wire RC estimates (the platform file, then `setRC_extra.tcl` for the layers it lacks — M8/M9 in ASAP7), and the optimizer blacklist — precisely the things ODB does not store. Keeping that knowledge in one proc is what makes six independent processes behave like one continuous session.
+The persistence contract in code: saving is just `write_db`; loading is `read_db` **plus the three context re-applications** — constraints ([02_constraints.md](../concepts/constraints.md)), wire RC estimates (`setRC_extra.tcl` first, for the layers stock ASAP7 lacks — M8/M9 — then the stack's own file, so a complete one overrides), and the optimizer blacklist — precisely the things ODB does not store. Keeping that knowledge in one proc is what makes six independent processes behave like one continuous session.
 
 ### Reports — `scripts/pnr/reports.tcl`
 

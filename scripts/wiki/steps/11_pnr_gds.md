@@ -34,7 +34,7 @@ fi
 KLayout is the one tool of the flow that may legitimately be absent (system-installed, not part of the EDA tree); the guard fails the stage with a clear message — everything before it (DEF/ODB, reports) already exists, so a missing KLayout costs only the GDS.
 
 ```bash
-TECH_LEF="${ASAP7_HOME}/lef/asap7_tech_1x_201209.lef"
+TECH_LEF="${BEOL_HOME}/lef/asap7_tech_1x_201209.lef"
 SC_LEF="${ASAP7_HOME}/lef/asap7sc7p5t_28_R_1x_220121a.lef"
 SC_GDS="${ASAP7_HOME}/gds/asap7sc7p5t_28_R_220121a.gds"
 
@@ -48,7 +48,7 @@ if [ "${SEL_MACRO_DIRS}" != "none" ]; then
 fi
 
 sed "s,<lef-files>.*</lef-files>,${LEF_FILES}," \
-    "${ASAP7_HOME}/KLayout/asap7.lyt" > "${IMP}/output/klayout.lyt"
+    "${BEOL_HOME}/KLayout/asap7.lyt" > "${IMP}/output/klayout.lyt"
 ```
 
 The technology-file preparation. The platform ships `asap7.lyt` with a *relative* LEF path that only resolves from inside the platform tree, so the script rewrites its `<lef-files>` entry with absolute paths — tech LEF plus cell LEF, extended in hierarchical runs with each block's abstract (so the DEF reader knows the macros' outlines) while each block's *GDS* joins the merge list (so the abstracts get substituted by the blocks' real layouts). The generated `klayout.lyt` is kept in the run directory — it doubles as a ready-made viewing setup.

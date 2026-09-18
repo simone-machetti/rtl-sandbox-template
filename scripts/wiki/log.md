@@ -2,6 +2,10 @@
 
 Change history for the Learn ASIC Flow wiki — newest first. Entries are grouped by ISO-8601 date, each line `**[Action]**: description`.
 
+## 2026-09-18
+
+- **[Update]**: The metal stack is selectable independently of the cell library: `ASAP7_HOME` (`$PDK_HOME/vendor/asap7`) supplies liberty, cell LEF, GDS and simulation models for every run, while the seven stack files (tech LEF, tracks, PDN strategy, wire RC, extraction rules, layer map) are read from `BEOL_HOME`, which is `$PDK_HOME/beol/$BEOL`, or the stock tree for `BEOL=asap7`. `setRC_extra.tcl` is now sourced before the stack's RC file so a complete file overrides it — [05](steps/05_pnr_overview.md), [06](steps/06_pnr_floorplan.md), [10](steps/10_pnr_final.md), [11](steps/11_pnr_gds.md), [Technology](concepts/technology.md), [knobs](references/knobs.md).
+
 ## 2026-09-16
 
 - **[Update]**: The technology tree is selectable per run: the Makefile derives `ASAP7_HOME` as `$PDK_HOME/platforms/$PLATFORM` (`asap7` by default, `PDK_HOME` being the checkout of the platform repository) and the gate-level file lists read the OA-cell models from the platform tree like the other groups — [Technology](concepts/technology.md), [Pipeline](concepts/pipeline.md), [02](steps/02_post_syn_sim.md), [12](steps/12_post_pnr_sim.md), [knobs](references/knobs.md).

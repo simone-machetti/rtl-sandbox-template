@@ -4,15 +4,15 @@ Every tunable of the flow in one place: the make-level parameters, the script-le
 
 ## Run plumbing
 
-| Knob          | Steps       | Default          | Effect                                                                                      | Doc                                     |
-| ------------- | ----------- | ---------------- | ------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `PROJECT`     | all         | — (required)     | Selects the project tree                                                                    | [pipeline](../concepts/pipeline.md)     |
-| `PLATFORM`    | all but sim | asap7            | Platform tree `$PDK_HOME/platforms/<name>`                                                  | [technology](../concepts/technology.md) |
-| `TOP_LEVEL`   | all         | — (required)     | The module to build/analyze                                                                 | [pipeline](../concepts/pipeline.md)     |
-| `OUT_DIR`     | all         | `no_name`        | Run directory name; full runs always start clean                                            | [pipeline](../concepts/pipeline.md)     |
-| `NETLIST_DIR` | pnr, post-* | `no_name`        | The producing run to consume (syn for pnr/post-syn, pnr for post-pnr)                       | [pipeline](../concepts/pipeline.md)     |
-| `VCD_DIR`     | *-dpa       | `no_name`        | The simulation run holding `activity.vcd`                                                   | [04](../steps/04_post_syn_dpa.md)       |
-| `TB`          | sims, dpas  | `tb_<top_level>` | Bench selection (must follow the bench conventions)                                         | [00](../steps/00_sim.md)                |
+| Knob          | Steps       | Default          | Effect                                                                | Doc                                     |
+| ------------- | ----------- | ---------------- | --------------------------------------------------------------------- | --------------------------------------- |
+| `PROJECT`     | all         | — (required)     | Selects the project tree                                              | [pipeline](../concepts/pipeline.md)     |
+| `BEOL`        | pnr         | asap7            | Metal stack `$PDK_HOME/beol/<name>`; `asap7` = the stock stack        | [technology](../concepts/technology.md) |
+| `TOP_LEVEL`   | all         | — (required)     | The module to build/analyze                                           | [pipeline](../concepts/pipeline.md)     |
+| `OUT_DIR`     | all         | `no_name`        | Run directory name; full runs always start clean                      | [pipeline](../concepts/pipeline.md)     |
+| `NETLIST_DIR` | pnr, post-* | `no_name`        | The producing run to consume (syn for pnr/post-syn, pnr for post-pnr) | [pipeline](../concepts/pipeline.md)     |
+| `VCD_DIR`     | *-dpa       | `no_name`        | The simulation run holding `activity.vcd`                             | [04](../steps/04_post_syn_dpa.md)       |
+| `TB`          | sims, dpas  | `tb_<top_level>` | Bench selection (must follow the bench conventions)                   | [00](../steps/00_sim.md)                |
 
 ## Timing intent
 

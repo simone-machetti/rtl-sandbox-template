@@ -85,7 +85,7 @@ make post-pnr-sta PROJECT=<project> TOP_LEVEL=<top_level> CLK_PERIOD_NS=1.0 OUT_
 make post-pnr-dpa PROJECT=<project> TOP_LEVEL=<top_level> CLK_PERIOD_NS=1.0 OUT_DIR=<name> NETLIST_DIR=<name> VCD_DIR=<name>
 ```
 
-`PROJECT` and `TOP_LEVEL` are required on every command — there is no default. See `projects/<project>/README.md` for the available `TOP_LEVEL` values and runnable examples; the [example project README](projects/example/README.md) walks the whole pipeline end to end. `PLATFORM=<name>` selects the technology tree `$PDK_HOME/platforms/<name>` (default `asap7`; see [Environment setup](#environment-setup)).
+`PROJECT` and `TOP_LEVEL` are required on every command — there is no default. See `projects/<project>/README.md` for the available `TOP_LEVEL` values and runnable examples; the [example project README](projects/example/README.md) walks the whole pipeline end to end. `BEOL=<name>` selects the metal stack `$PDK_HOME/beol/<name>` for place-and-route (default `asap7`, the stock stack; see [Environment setup](#environment-setup)).
 
 ## Repository structure
 
@@ -156,13 +156,13 @@ Tool and PDK install locations are **per-user**: you declare them in your `~/.ba
 source sourceme.sh
 ```
 
-`sourceme.sh` sets `REPO_HOME` from its own location and sources `~/.bashrc`; the Makefile derives `ASAP7_HOME` as `$PDK_HOME/platforms/$PLATFORM`. You therefore export only the install **roots** in your `~/.bashrc` — the shared flow itself is project- and machine-agnostic:
+`sourceme.sh` sets `REPO_HOME` from its own location and sources `~/.bashrc`; the Makefile derives `ASAP7_HOME`, the cell library, as `$PDK_HOME/vendor/asap7`, and `BEOL_HOME`, the metal stack, as `$PDK_HOME/beol/$BEOL` (the same tree as the cells for `BEOL=asap7`). You therefore export only the install **roots** in your `~/.bashrc` — the shared flow itself is project- and machine-agnostic:
 
-| Variable                                                                            | Purpose                                                                                                                           |
-| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `EDA_HOME`                                                                          | Root holding the EDA tool installs.                                                                                               |
-| `VERILATOR_HOME`, `YOSYS_HOME`, `YOSYS_SLANG_HOME`, `OPENSTA_HOME`, `OPENROAD_HOME` | Per-tool install dirs (conventionally `$EDA_HOME/<tool>`); each tool's `bin/` must be on `PATH`.                                  |
-| `PDK_HOME`                                                                          | Root holding the ASAP7 platform trees, one per technology variant at `$PDK_HOME/platforms/<name>` (see the `PLATFORM` parameter). |
+| Variable                                                                            | Purpose                                                                                                                                                       |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EDA_HOME`                                                                          | Root holding the EDA tool installs.                                                                                                                           |
+| `VERILATOR_HOME`, `YOSYS_HOME`, `YOSYS_SLANG_HOME`, `OPENSTA_HOME`, `OPENROAD_HOME` | Per-tool install dirs (conventionally `$EDA_HOME/<tool>`); each tool's `bin/` must be on `PATH`.                                                              |
+| `PDK_HOME`                                                                          | Checkout of the ASAP7 platform repository: the cell library under `vendor/asap7`, one metal stack per variant under `beol/<name>` (see the `BEOL` parameter). |
 
 A minimal `~/.bashrc` block — add this and adjust the two roots (`EDA_HOME` and `PDK_HOME`) to your machine:
 
@@ -183,7 +183,7 @@ export PDK_HOME=/opt/pdks/asap7
 Notes:
 
 - **Do not** set `REPO_HOME` — `sourceme.sh` derives it from its own location, so the repo works unchanged if renamed or reused for a different project.
-- `PDK_HOME` holds one platform tree per technology variant at `platforms/<name>`, in the OpenROAD-flow-scripts ASAP7 layout; `make ... PLATFORM=<name>` selects one (default `asap7`) and `ASAP7_HOME=<path>` on the command line overrides the tree entirely. The stock OpenROAD-flow-scripts tree lacks the OA-cell Verilog models that gate-level simulation reads from `verilog/stdcell/`, so a platform tree must add them from the ASU library repository (`asap7sc7p5t_27`).
+- `PDK_HOME` holds the ASAP7 platform in the OpenROAD-flow-scripts layout under `vendor/asap7`, completed with the OA-cell Verilog model from the ASU library repository (`asap7sc7p5t_27`), which gate-level simulation reads from `verilog/stdcell/` and the stock tree lacks. A metal-stack variant is a folder `beol/<name>` holding only the files it changes (tech LEF, tracks, PDN strategy, wire RC, extraction rules, layer map); `make ... BEOL=<name>` selects it for a run, and `BEOL_HOME=<path>` on the command line points place-and-route at a stack folder anywhere.
 - The final `make pnr` stage (DEF-to-GDS merge) additionally needs `klayout` (≥ 0.28) on `PATH`; a system-wide install is fine. The flow produces the routed DEF/ODB without it and errors clearly at the GDS stage if it is missing.
 
 ## Typical workflow
@@ -415,42 +415,42 @@ make clean-all                # remove all sim/ and imp/ directories
 
 ### Make-level parameters reference
 
-| Parameter            | Make targets                     | Values                           | Description                                                                           |
-| -------------------- | -------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------- |
-| `PROJECT`            | all                              | project name                     | Required. Project under `projects/` to operate on (no default)                        |
-| `PLATFORM`           | all except sim, init and clean-* | platform name (default: `asap7`) | Technology tree of the run, `$PDK_HOME/platforms/<name>`                              |
-| `TOP_LEVEL`          | all except init and clean-*      | module name                      | RTL module to build/simulate; can be any module in the hierarchy                      |
-| `TB`                 | sim, post-*-sim, post-*-dpa      | testbench module name            | Testbench to run (default `tb_$(TOP_LEVEL)`)                                          |
-| `CLK_PERIOD_NS`      | all except init and clean-*      | e.g. `1.0`                       | Clock period in nanoseconds (for `syn`: the ABC delay target, default `1.0`)          |
-| `OUT_DIR`            | all except clean-all             | directory name                   | Output subdirectory under `sim/` or `imp/`                                            |
-| `NETLIST_DIR`        | pnr, post-syn-*, post-pnr-*      | e.g. `syn_top_example`           | Netlist run to consume (`make syn` for pnr/post-syn-*, `make pnr` for post-pnr-*)     |
-| `VCD_DIR`            | post-syn-dpa, post-pnr-dpa       | e.g. `sim_top_example`           | Directory containing `activity.vcd` from the matching gate-level simulation           |
-| `PARAMS`             | sim, syn, post-*-sim             | `"KEY=VAL ..."`                  | Project-specific RTL elaboration parameters                                           |
-| `VCD`                | sim, post-*-sim                  | `0` (default), `1`               | Enable Verilator tracing and dump `activity.vcd`                                      |
-| `KEEP_HIERARCHY`     | syn, post-syn-dpa                | `0` (default), `1`               | Preserve module boundaries in the netlist                                             |
-| `KEEP_MODULES`       | syn, post-syn-dpa                | `"mod ..."` (default: `none`)    | Preserve only the listed module boundaries and flatten everything below them          |
-| `BLACKBOX_MODULES`   | syn, post-syn-dpa                | `"mod ..."` (default: `none`)    | Do not elaborate the listed modules; link their netlists from an earlier run          |
-| `LINK_BLACKBOXES`    | syn                              | `1` (default), `0`               | `0` keeps blackboxed modules as empty stubs for hierarchical P&R                      |
-| `CORE_UTIL`          | pnr                              | percent (default: `40`)          | Core utilization for the floorplan; die area derives from it                          |
-| `ASPECT_RATIO`       | pnr                              | ratio (default: `1.0`)           | Core height/width ratio                                                               |
-| `CORE_MARGIN`        | pnr                              | µm (default: `2`)                | Margin between core area and die edge                                                 |
-| `PLACE_DENSITY`      | pnr                              | 0–1 (default: `0.60`)            | Global placement target density                                                       |
-| `MAX_ROUTE_LAYER`    | pnr                              | layer (default: `M7`)            | Top signal-routing layer; `M5` when hardening a tile keeps M6/M7 free for the parent  |
-| `CLK_UNCERTAINTY_PS` | pnr                              | ps (default: `0`)                | Clock uncertainty applied to the clocks                                               |
-| `PNR_STEP`           | pnr                              | `all` (default) or a stage name  | `all` = full clean run; a stage name re-runs that stage from the previous checkpoint  |
-| `PNR_THREADS`        | pnr                              | `0` (default) or thread count    | OpenROAD thread count; `0` = all cores. Fewer route threads lower the memory peak     |
-| `PNR_REPAIR`         | pnr                              | `1` (default), `0`               | `0` = routability-only run: skips design/timing repair, keeps the netlist unbuffered  |
-| `MACRO_DIRS`         | pnr, post-pnr-*                  | `"dir ..."` (default: `none`)    | Hardened-block run dirs to bind as hard macros                                        |
-| `MACRO_CHANNEL`      | pnr                              | µm (default: `10`)               | Gap between adjacent macro columns, used by the project floorplan file                |
-| `MACRO_CHANNEL_Y`    | pnr                              | µm (default: `MACRO_CHANNEL`)    | Gap between adjacent macro rows, used by the project floorplan file                   |
-| `FLOORPLAN`          | pnr                              | path (default: `none`)           | Project-owned macro-placement TCL sourced after the floorplan                         |
-| `PDN`                | pnr                              | path (default: `none`)           | PDN strategy override (macro runs default to `scripts/pnr/pdn_macro.tcl`)             |
-| `PINS`               | pnr                              | path (default: `none`)           | Project-owned pin-constraint TCL sourced at floorplan (kept by the checkpoints)       |
-| `PIN_LAYERS_HOR`     | pnr                              | layers (default: `M4`)           | Pin layers for the left/right edges (space-separated list allowed)                    |
-| `PIN_LAYERS_VER`     | pnr                              | layers (default: `M5`)           | Pin layers for the top/bottom edges (space-separated list allowed)                    |
-| `PIN_ARGS`           | pnr                              | flags (default: `none`)          | Extra flags passed through to `place_pins`                                            |
-| `IO_DELAY_PCT`       | pnr, post-*-sta, post-*-dpa      | percent (default: `0`)           | Input/output delay on the data ports as a percentage of the period (hardening budget) |
-| `SDC`                | pnr, post-*-sta, post-*-dpa      | path (default: `none`)           | Project-owned constraint additions sourced after the generated constraints            |
+| Parameter            | Make targets                | Values                          | Description                                                                                    |
+| -------------------- | --------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `PROJECT`            | all                         | project name                    | Required. Project under `projects/` to operate on (no default)                                 |
+| `BEOL`               | pnr                         | stack name (default: `asap7`)   | Metal stack of the run, `$PDK_HOME/beol/<name>`; `asap7` = the stock stack of the cell library |
+| `TOP_LEVEL`          | all except init and clean-* | module name                     | RTL module to build/simulate; can be any module in the hierarchy                               |
+| `TB`                 | sim, post-*-sim, post-*-dpa | testbench module name           | Testbench to run (default `tb_$(TOP_LEVEL)`)                                                   |
+| `CLK_PERIOD_NS`      | all except init and clean-* | e.g. `1.0`                      | Clock period in nanoseconds (for `syn`: the ABC delay target, default `1.0`)                   |
+| `OUT_DIR`            | all except clean-all        | directory name                  | Output subdirectory under `sim/` or `imp/`                                                     |
+| `NETLIST_DIR`        | pnr, post-syn-*, post-pnr-* | e.g. `syn_top_example`          | Netlist run to consume (`make syn` for pnr/post-syn-*, `make pnr` for post-pnr-*)              |
+| `VCD_DIR`            | post-syn-dpa, post-pnr-dpa  | e.g. `sim_top_example`          | Directory containing `activity.vcd` from the matching gate-level simulation                    |
+| `PARAMS`             | sim, syn, post-*-sim        | `"KEY=VAL ..."`                 | Project-specific RTL elaboration parameters                                                    |
+| `VCD`                | sim, post-*-sim             | `0` (default), `1`              | Enable Verilator tracing and dump `activity.vcd`                                               |
+| `KEEP_HIERARCHY`     | syn, post-syn-dpa           | `0` (default), `1`              | Preserve module boundaries in the netlist                                                      |
+| `KEEP_MODULES`       | syn, post-syn-dpa           | `"mod ..."` (default: `none`)   | Preserve only the listed module boundaries and flatten everything below them                   |
+| `BLACKBOX_MODULES`   | syn, post-syn-dpa           | `"mod ..."` (default: `none`)   | Do not elaborate the listed modules; link their netlists from an earlier run                   |
+| `LINK_BLACKBOXES`    | syn                         | `1` (default), `0`              | `0` keeps blackboxed modules as empty stubs for hierarchical P&R                               |
+| `CORE_UTIL`          | pnr                         | percent (default: `40`)         | Core utilization for the floorplan; die area derives from it                                   |
+| `ASPECT_RATIO`       | pnr                         | ratio (default: `1.0`)          | Core height/width ratio                                                                        |
+| `CORE_MARGIN`        | pnr                         | µm (default: `2`)               | Margin between core area and die edge                                                          |
+| `PLACE_DENSITY`      | pnr                         | 0–1 (default: `0.60`)           | Global placement target density                                                                |
+| `MAX_ROUTE_LAYER`    | pnr                         | layer (default: `M7`)           | Top signal-routing layer; `M5` when hardening a tile keeps M6/M7 free for the parent           |
+| `CLK_UNCERTAINTY_PS` | pnr                         | ps (default: `0`)               | Clock uncertainty applied to the clocks                                                        |
+| `PNR_STEP`           | pnr                         | `all` (default) or a stage name | `all` = full clean run; a stage name re-runs that stage from the previous checkpoint           |
+| `PNR_THREADS`        | pnr                         | `0` (default) or thread count   | OpenROAD thread count; `0` = all cores. Fewer route threads lower the memory peak              |
+| `PNR_REPAIR`         | pnr                         | `1` (default), `0`              | `0` = routability-only run: skips design/timing repair, keeps the netlist unbuffered           |
+| `MACRO_DIRS`         | pnr, post-pnr-*             | `"dir ..."` (default: `none`)   | Hardened-block run dirs to bind as hard macros                                                 |
+| `MACRO_CHANNEL`      | pnr                         | µm (default: `10`)              | Gap between adjacent macro columns, used by the project floorplan file                         |
+| `MACRO_CHANNEL_Y`    | pnr                         | µm (default: `MACRO_CHANNEL`)   | Gap between adjacent macro rows, used by the project floorplan file                            |
+| `FLOORPLAN`          | pnr                         | path (default: `none`)          | Project-owned macro-placement TCL sourced after the floorplan                                  |
+| `PDN`                | pnr                         | path (default: `none`)          | PDN strategy override (macro runs default to `scripts/pnr/pdn_macro.tcl`)                      |
+| `PINS`               | pnr                         | path (default: `none`)          | Project-owned pin-constraint TCL sourced at floorplan (kept by the checkpoints)                |
+| `PIN_LAYERS_HOR`     | pnr                         | layers (default: `M4`)          | Pin layers for the left/right edges (space-separated list allowed)                             |
+| `PIN_LAYERS_VER`     | pnr                         | layers (default: `M5`)          | Pin layers for the top/bottom edges (space-separated list allowed)                             |
+| `PIN_ARGS`           | pnr                         | flags (default: `none`)         | Extra flags passed through to `place_pins`                                                     |
+| `IO_DELAY_PCT`       | pnr, post-*-sta, post-*-dpa | percent (default: `0`)          | Input/output delay on the data ports as a percentage of the period (hardening budget)          |
+| `SDC`                | pnr, post-*-sta, post-*-dpa | path (default: `none`)          | Project-owned constraint additions sourced after the generated constraints                     |
 
 ## License
 

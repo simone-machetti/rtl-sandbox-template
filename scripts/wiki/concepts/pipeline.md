@@ -37,7 +37,7 @@ Two properties make the flow composable:
 | OpenSTA             | Static timing and power analysis        | post-*-sta, post-*-dpa |
 | KLayout             | Final GDS merge and layout viewing      | pnr (6_gds)            |
 
-The technology is **ASAP7**: a 7 nm predictive, academic PDK (`asap7sc7p5t` — 7.5-track cells, RVT flavor, TT corner in this flow). It is read from one platform tree in the OpenROAD-flow-scripts layout (`$ASAP7_HOME` = `$PDK_HOME/platforms/$PLATFORM`, `asap7` by default), from which the flow takes liberty files, LEFs, GDS, and physical-setup scripts. [01_technology.md](technology.md) dissects all of it. The implementation style is **block-level**: pins on routing layers, no pad ring, single power domain — the standard style for IP blocks that integrate into a larger die.
+The technology is **ASAP7**: a 7 nm predictive, academic PDK (`asap7sc7p5t` — 7.5-track cells, RVT flavor, TT corner in this flow). It is read from one platform tree in the OpenROAD-flow-scripts layout (`$ASAP7_HOME`, the vendored ASAP7 tree, for the cells; `$BEOL_HOME` for the metal stack, with `BEOL=<name>` selecting a variant), from which the flow takes liberty files, LEFs, GDS, and physical-setup scripts. [01_technology.md](technology.md) dissects all of it. The implementation style is **block-level**: pins on routing layers, no pad ring, single power domain — the standard style for IP blocks that integrate into a larger die.
 
 ## Repository conventions
 

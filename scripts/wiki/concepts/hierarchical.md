@@ -58,7 +58,7 @@ if {$::env(SEL_PDN) ne "none"} {
 } elseif {$::env(SEL_MACRO_DIRS) ne "none"} {
     set PDN_CFG $::env(REPO_HOME)/scripts/pnr/pdn_macro.tcl
 } else {
-    set PDN_CFG $::env(ASAP7_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
+    set PDN_CFG $::env(BEOL_HOME)/openRoad/pdn/grid_strategy-M1-M2-M5-M6.tcl
 }
 ```
 

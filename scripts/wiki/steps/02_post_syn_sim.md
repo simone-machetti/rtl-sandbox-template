@@ -75,7 +75,7 @@ $(ASAP7_HOME)/verilog/stdcell/asap7sc7p5t_OA_RVT_TT_201020.v
 $(REPO_HOME)/projects/$(SEL_PROJECT)/imp/$(SEL_NETLIST_DIR)/output/netlist.v
 ```
 
-Combinational cell models come from the platform tree (the OA group is absent from the OpenROAD-flow-scripts package; the assembled platform tree adds it from the ASU library repository). The first entry is the flow's own file: **`asap7_seq_behav.v`**, behavioral replacements for the *sequential* cells (flip-flops, ICG). They exist because the PDK's sequential models are built on Verilog-1995 UDP primitives ("user-defined primitives" — truth-table constructs) that Verilator does not implement and, worse, miscompiles silently — the flow substitutes ordinary behavioral `always` models with identical function. If sequential mapping ever emits a cell the file does not cover, its model must be added there.
+Combinational cell models come from the platform tree (the OA group is absent from the OpenROAD-flow-scripts package; the platform repository's setup script copies it in from the ASU library repository). The first entry is the flow's own file: **`asap7_seq_behav.v`**, behavioral replacements for the *sequential* cells (flip-flops, ICG). They exist because the PDK's sequential models are built on Verilog-1995 UDP primitives ("user-defined primitives" — truth-table constructs) that Verilator does not implement and, worse, miscompiles silently — the flow substitutes ordinary behavioral `always` models with identical function. If sequential mapping ever emits a cell the file does not cover, its model must be added there.
 
 ## Design space
 
