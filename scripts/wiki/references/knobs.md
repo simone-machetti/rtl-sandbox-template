@@ -35,13 +35,19 @@ Every tunable of the flow in one place: the make-level parameters, the script-le
 
 ## Synthesis
 
-| Knob                   | Default                  | Effect                                                                                                          | Doc                                         |
-| ---------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `KEEP_HIERARCHY`       | 0                        | Preserve all module boundaries: per-module reporting vs optimization freedom                                    | [01](../steps/01_syn.md)                    |
-| `KEEP_MODULES`         | none                     | Preserve selected boundaries only                                                                               | [01](../steps/01_syn.md)                    |
-| `BLACKBOX_MODULES`     | none                     | Reuse prior component runs; constant sub-results, boundary pessimism                                            | [01](../steps/01_syn.md)                    |
-| `LINK_BLACKBOXES`      | 1                        | `0` = leave stubs empty → macro-ready netlist                                                                   | [hierarchical](../concepts/hierarchical.md) |
-| ABC script (`abc.tcl`) | map/buffer/sizing recipe | The mapping strategy itself; `{D}` carries the delay target. Alternative recipes (`&nf`) are the QoR experiment | [01](../steps/01_syn.md)                    |
+| Knob                   | Default                  | Effect                                                                                                                                                                    | Doc                                         |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `KEEP_HIERARCHY`       | 0                        | Preserve all module boundaries: per-module reporting vs optimization freedom                                                                                              | [01](../steps/01_syn.md)                    |
+| `KEEP_MODULES`         | none                     | Preserve selected boundaries only                                                                                                                                         | [01](../steps/01_syn.md)                    |
+| `BLACKBOX_MODULES`     | none                     | Reuse prior component runs; constant sub-results, boundary pessimism                                                                                                      | [01](../steps/01_syn.md)                    |
+| `LINK_BLACKBOXES`      | 1                        | `0` = leave stubs empty → macro-ready netlist                                                                                                                             | [hierarchical](../concepts/hierarchical.md) |
+| ABC script (`abc.tcl`) | map/buffer/sizing recipe | The mapping strategy itself; `{D}` carries the delay target. Alternative recipes (`&nf`) are the QoR experiment                                                           | [01](../steps/01_syn.md)                    |
+| `VT_SWAP`              | 0                        | `1` = after Yosys, buffer high-fanout nets and swap failing paths to LVT/SLVT (component runs; blackbox runs link `imp/<mod>_vt_syn/`). ↑ speed at equal area, ↑ leakage  | [01](../steps/01_syn.md)                    |
+| `FANOUT_BUF`           | 16                       | Input nets above this fanout get a root buffer before `repair_design` in the swap step                                                                                    | [01](../steps/01_syn.md)                    |
+| `BUF_OUTPUTS`          | 0                        | `1` = one buffer per output port in the swap step, for blocks whose outputs feed a whole grid                                                                             | [01](../steps/01_syn.md)                    |
+| `SWAP_TNS`             | 100                      | Share (%) of the failing registers the swap repairs after the worst one. `0` = the worst path only: stops once it has no cell left to switch, far shorter on large blocks | [01](../steps/01_syn.md)                    |
+| `SWAP_LAST_GASP`       | 1                        | `0` = skip the swap's last-gasp round over the failing registers                                                                                                          | [01](../steps/01_syn.md)                    |
+| `SWAP_REPAIRS`         | 1                        | Cells the swap switches per pass on the worst paths. ↑ = fewer passes, faster runs, more SLVT cells (leakage)                                                             | [01](../steps/01_syn.md)                    |
 
 ## Floorplan
 
@@ -113,7 +119,7 @@ Every tunable of the flow in one place: the make-level parameters, the script-le
 Recurring multi-knob procedures, for orientation:
 
 - **Congestion / routing DRCs**: `PLACE_DENSITY` down → `CORE_UTIL` down → layer adjustment up → floorplan rework (shape, pins, macros).
-- **Setup closure**: `CLK_PERIOD_NS` up (accept slower) — or hold the target and work the implementation: density/placement modes, CTS tuning, and (beyond this flow's defaults) VT mixing and post-route optimization.
+- **Setup closure**: `CLK_PERIOD_NS` up (accept slower) — or hold the target and work the implementation: VT mixing in synthesis (`VT_SWAP=1`), density/placement modes, CTS tuning, and (beyond this flow's defaults) post-route optimization.
 - **Memory ceiling**: `PNR_THREADS` down → hierarchical decomposition ([hierarchical](../concepts/hierarchical.md)).
 - **Power reduction**: utilization up (shorter wires), clock gating (architectural), decap/leakage balance, frequency/voltage outside the flow's scope.
 

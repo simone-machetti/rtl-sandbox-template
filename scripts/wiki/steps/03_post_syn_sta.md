@@ -7,9 +7,9 @@ The first timing measurement of the netlist: exhaustive, vectorless, and — at 
 **Inputs**
 
 - Post-syn netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty, RVT; with `VT_SWAP=1` also LVT and SLVT)
 - Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with zero I/O delays, hold false-pathed on I/O
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `VT_SWAP`, `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 
@@ -49,6 +49,20 @@ link_design  $env(SEL_TOP_LEVEL)
 ```
 
 The standard loading sequence: timing models, then the netlist, then linking (every instance bound to a liberty cell; unresolved names error here).
+
+```tcl
+if {$env(SEL_VT_SWAP) ne "0"} {
+    foreach vt {LVT SLVT} {
+        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_${vt}_TT_nldm_220123.lib
+        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_${vt}_TT_nldm_211120.lib.gz
+        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_${vt}_TT_nldm_220122.lib.gz
+        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_${vt}_TT_nldm_211120.lib.gz
+        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_${vt}_TT_nldm_211120.lib.gz
+    }
+}
+```
+
+A netlist from a `VT_SWAP=1` synthesis ([01_syn.md](01_syn.md)) contains LVT and SLVT cells, so the analysis must run with `VT_SWAP=1` too; without it, linking stops at the first unknown cell.
 
 ```tcl
 set CLK_PERIOD_PS [expr {$env(SEL_CLK_PERIOD_NS) * 1000}]
@@ -110,15 +124,16 @@ Four reports: a sanity report of anything *still* unconstrained (should be only 
 
 ## Knobs
 
-| Knob            | Where | Default | Effect / tradeoff                                |
-| --------------- | ----- | ------- | ------------------------------------------------ |
-| `CLK_PERIOD_NS` | make  | 1.0     | The reference period; WNS is measured against it |
-| `NETLIST_DIR`   | make  | —       | Which netlist to analyze                         |
+| Knob            | Where | Default | Effect / tradeoff                                                   |
+| --------------- | ----- | ------- | ------------------------------------------------------------------- |
+| `CLK_PERIOD_NS` | make  | 1.0     | The reference period; WNS is measured against it                    |
+| `NETLIST_DIR`   | make  | —       | Which netlist to analyze                                            |
+| `VT_SWAP`       | make  | 0       | `1` = also load LVT and SLVT, for netlists of a swap-step synthesis |
 
 ## Notes and caveats
 
 - **Zero-wire optimism**: no SPEF and no `set_wire_rc` are loaded here, so nets are ideal; reported WNS is a lower bound on the real critical path.
-- **The high-fanout artifact**: synthesized netlists carry unbuffered register-driven broadcast nets ([01_syn.md](01_syn.md)); on large flat or blackbox-linked netlists those nets show grotesque slews and dominate WNS. They are a real property of *this netlist* but not of the eventual implementation (P&R's `repair_design` buffers them immediately) — pre-layout WNS of such netlists must not be used as a frequency claim. Component-level netlists, self-contained by construction, give the meaningful pre-layout numbers.
+- **The high-fanout artifact**: synthesized netlists carry unbuffered register-driven broadcast nets ([01_syn.md](01_syn.md)); on large flat or blackbox-linked netlists those nets show grotesque slews and dominate WNS. They are a real property of *this netlist* but not of the eventual implementation (P&R's `repair_design` buffers them immediately) — pre-layout WNS of such netlists must not be used as a frequency claim. Component-level netlists, self-contained by construction, give the meaningful pre-layout numbers — or a grid linked from `VT_SWAP=1` components, which buffer their high-fanout inputs during synthesis.
 - Because analysis is linear in the period, one run at any period gives the minimum: `min_period = period − WNS`.
 - Blackbox-linked netlists analyze fine (the linked modules carry real gates), but cross-boundary paths were never co-optimized — expect them pessimistic.
 

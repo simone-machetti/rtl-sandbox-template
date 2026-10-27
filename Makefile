@@ -15,6 +15,12 @@ PARAMS               ?= none
 KEEP_HIERARCHY       ?= 0
 KEEP_MODULES         ?= none
 BLACKBOX_MODULES     ?= none
+VT_SWAP              ?= 0
+FANOUT_BUF           ?= 16
+BUF_OUTPUTS          ?= 0
+SWAP_TNS             ?= 100
+SWAP_LAST_GASP       ?= 1
+SWAP_REPAIRS         ?= 1
 VCD                  ?= 0
 BUILD_JOBS           ?= 0
 CORE_UTIL            ?= 40
@@ -61,6 +67,12 @@ export SEL_PARAMS               := $(PARAMS)
 export SEL_KEEP_HIERARCHY       := $(KEEP_HIERARCHY)
 export SEL_KEEP_MODULES         := $(KEEP_MODULES)
 export SEL_BLACKBOX_MODULES     := $(BLACKBOX_MODULES)
+export SEL_VT_SWAP              := $(VT_SWAP)
+export SEL_FANOUT_BUF           := $(FANOUT_BUF)
+export SEL_BUF_OUTPUTS          := $(BUF_OUTPUTS)
+export SEL_SWAP_TNS             := $(SWAP_TNS)
+export SEL_SWAP_LAST_GASP       := $(SWAP_LAST_GASP)
+export SEL_SWAP_REPAIRS         := $(SWAP_REPAIRS)
 export SEL_VCD                  := $(VCD)
 export SEL_BUILD_JOBS           := $(BUILD_JOBS)
 export SEL_CORE_UTIL            := $(CORE_UTIL)
@@ -111,7 +123,10 @@ syn: clean-imp
 	mkdir -p $(PROJ_DIR)/imp/$(OUT_DIR) && \
 	mkdir -p $(PROJ_DIR)/imp/$(OUT_DIR)/output && \
 	mkdir -p $(PROJ_DIR)/imp/$(OUT_DIR)/report && \
-	yosys -l $(PROJ_DIR)/imp/$(OUT_DIR)/output/yosys.log -c $(REPO_HOME)/scripts/syn/run.tcl
+	yosys -l $(PROJ_DIR)/imp/$(OUT_DIR)/output/yosys.log -c $(REPO_HOME)/scripts/syn/run.tcl && \
+	if [ "$(VT_SWAP)" = "1" ] && [ "$(BLACKBOX_MODULES)" = "none" ]; then \
+	openroad -no_init -exit $(REPO_HOME)/scripts/syn/vt_swap.tcl | tee $(PROJ_DIR)/imp/$(OUT_DIR)/output/openroad.log; \
+	fi
 
 pnr: $(if $(filter all,$(PNR_STEP)),clean-imp)
 	cd $(REPO_HOME)/scripts/pnr && \

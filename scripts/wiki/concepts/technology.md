@@ -31,7 +31,7 @@ A `.lib` file is a text database with one `cell` entry per gate. For each input-
 Three axes multiply the number of `.lib` files:
 
 - **Corner (PVT)**: process (slow/typical/fast transistors), voltage, temperature. A library is characterized per corner — e.g. `TT` 0.70 V (typical), `SS` 0.63 V 100 °C (worst-case slow, setup signoff), `FF` 0.77 V 0 °C (fast, hold signoff). This flow runs single-corner **TT** throughout: architectural comparison, not signoff.
-- **VT flavor**: the same logical cell is offered with different threshold-voltage implants — in ASAP7: `R` (regular VT), `L` (low VT: faster, leakier), `SL` (super-low VT). Mixed-VT optimization is a classic leakage-vs-speed lever; this flow uses **RVT only**.
+- **VT flavor**: the same logical cell is offered with different threshold-voltage implants — in ASAP7: `R` (regular VT), `L` (low VT: faster, leakier), `SL` (super-low VT). Mixed-VT optimization is a classic leakage-vs-speed lever; this flow maps to **RVT**, and the optional synthesis step `VT_SWAP=1` swaps the cells of failing paths to LVT or SLVT ([01_syn.md](../steps/01_syn.md)); place-and-route loads RVT only.
 - **Functional group**: ASAP7 splits the library into five files — `SIMPLE` (basic gates), `INVBUF` (inverters/buffers), `AO`/`OA` (and-or / or-and complex gates), `SEQ` (flip-flops, latches, ICGs) — which is why every script reads five `read_liberty` lines.
 
 One consequence used everywhere in the flow: **the ASAP7 liberty time unit is the picosecond**, so every SDC value, every report and every delay target in the scripts is in ps (`CLK_PERIOD_NS × 1000`).
@@ -127,7 +127,7 @@ set_wire_rc -clock  -resistance 5.13971E-02 -capacitance 1.44549E-01
 | `ASAP7_HOME`       | make              | `$PDK_HOME/vendor/asap7` | The cell library: liberty, cell LEF, GDS, simulation models              |
 | `BEOL`             | make              | asap7                    | The metal stack: `$PDK_HOME/beol/<name>`, or the stock stack for `asap7` |
 | Liberty corner set | script file lists | RVT TT                   | Analysis realism vs runtime; SS/FF needed for signoff-style              |
-| VT flavors loaded  | script file lists | RVT only                 | Speed vs leakage optimization space                                      |
+| VT flavors loaded  | `VT_SWAP`         | RVT only                 | `1` = RVT + LVT + SLVT in synthesis and post-syn STA: speed vs leakage   |
 | NLDM vs CCS        | script file lists | NLDM                     | Model fidelity vs runtime                                                |
 
 ## Notes and caveats

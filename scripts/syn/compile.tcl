@@ -22,6 +22,20 @@ yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nld
 yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib"
 yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib"
 
+set vt_libs {}
+if {$env(SEL_VT_SWAP) ne "0"} {
+    foreach vt {LVT SLVT} {
+        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_${vt}_TT_nldm_220123.lib
+        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_${vt}_TT_nldm_211120.lib.gz
+        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_${vt}_TT_nldm_220122.lib.gz
+        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_${vt}_TT_nldm_211120.lib.gz
+        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_${vt}_TT_nldm_211120.lib.gz
+    }
+}
+foreach lib $vt_libs {
+    yosys "read_liberty -lib $lib"
+}
+
 # -----------------------------------------------------------------------------
 # Read SystemVerilog sources
 # -----------------------------------------------------------------------------

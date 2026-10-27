@@ -20,7 +20,8 @@ This README documents the shared EDA flow: the `make` targets, their parameters,
 │   ├── syn/                      # Logic synthesis flow
 │   │   ├── run.tcl               # Yosys top-level synthesis script (ASAP7)
 │   │   ├── compile.tcl           # RTL read and elaboration script
-│   │   └── abc.tcl               # ABC technology mapping script
+│   │   ├── abc.tcl               # ABC technology mapping script
+│   │   └── vt_swap.tcl           # Threshold-voltage swap (OpenROAD, VT_SWAP=1)
 │   ├── pnr/                      # Place-and-route flow (OpenROAD, ASAP7)
 │   │   ├── run.sh                # Stage sequencer (one openroad process per stage)
 │   │   ├── init_tech.tcl         # Liberty reads and ASAP7 technology settings
@@ -259,19 +260,28 @@ Outputs go to `projects/<PROJECT>/sim/<OUT_DIR>/`.
 
 ```bash
 make syn TOP_LEVEL=<top_level> OUT_DIR=<name> [CLK_PERIOD_NS=<val>] [PARAMS="KEY=VAL ..."] \
-    [KEEP_HIERARCHY=1] [KEEP_MODULES="mod ..."] [BLACKBOX_MODULES="mod ..."] [LINK_BLACKBOXES=0]
+    [KEEP_HIERARCHY=1] [KEEP_MODULES="mod ..."] [BLACKBOX_MODULES="mod ..."] [LINK_BLACKBOXES=0] \
+    [VT_SWAP=1] [FANOUT_BUF=<n>] [BUF_OUTPUTS=1] [SWAP_TNS=<pct>] [SWAP_LAST_GASP=0] [SWAP_REPAIRS=<n>] [IO_DELAY_PCT=<pct>] [SDC=<file>]
 ```
 
-| Parameter          | Required          | Description                                                                    |
-| ------------------ | ----------------- | ------------------------------------------------------------------------------ |
-| `TOP_LEVEL`        | yes               | RTL module to synthesize; can be any module in the hierarchy                   |
-| `OUT_DIR`          | yes               | Output subdirectory under `imp/`                                               |
-| `CLK_PERIOD_NS`    | no (default: 1.0) | Delay target for the ABC mapper (resolved script saved as `output/abc.script`) |
-| `PARAMS`           | no                | Project-specific RTL elaboration parameters                                    |
-| `KEEP_HIERARCHY`   | no (default: 0)   | Preserve every module boundary in the netlist (skips `flatten`)                |
-| `KEEP_MODULES`     | no                | Preserve only the listed module boundaries and flatten below them              |
-| `BLACKBOX_MODULES` | no                | Do not elaborate the listed modules; link their netlists from an earlier run   |
-| `LINK_BLACKBOXES`  | no (default: 1)   | `0` keeps the blackboxed modules as empty stubs for hierarchical `make pnr`    |
+| Parameter          | Required          | Description                                                                                                                                                                          |
+| ------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TOP_LEVEL`        | yes               | RTL module to synthesize; can be any module in the hierarchy                                                                                                                         |
+| `OUT_DIR`          | yes               | Output subdirectory under `imp/`                                                                                                                                                     |
+| `CLK_PERIOD_NS`    | no (default: 1.0) | Delay target for the ABC mapper (resolved script saved as `output/abc.script`); clock of the swap step                                                                               |
+| `PARAMS`           | no                | Project-specific RTL elaboration parameters                                                                                                                                          |
+| `KEEP_HIERARCHY`   | no (default: 0)   | Preserve every module boundary in the netlist (skips `flatten`)                                                                                                                      |
+| `KEEP_MODULES`     | no                | Preserve only the listed module boundaries and flatten below them                                                                                                                    |
+| `BLACKBOX_MODULES` | no                | Do not elaborate the listed modules; link their netlists from an earlier run                                                                                                         |
+| `LINK_BLACKBOXES`  | no (default: 1)   | `0` keeps the blackboxed modules as empty stubs for hierarchical `make pnr`                                                                                                          |
+| `VT_SWAP`          | no (default: 0)   | `1` = after Yosys, OpenROAD buffers high-fanout nets and swaps failing paths to LVT/SLVT (runs without `BLACKBOX_MODULES`); with `BLACKBOX_MODULES`, links `imp/<mod>_vt_syn/` first |
+| `FANOUT_BUF`       | no (default: 16)  | Swap step: input nets above this fanout get a root buffer before repair                                                                                                              |
+| `BUF_OUTPUTS`      | no (default: 0)   | Swap step: `1` adds one buffer per output port                                                                                                                                       |
+| `SWAP_TNS`         | no (default: 100) | Swap step: share (%) of the failing registers repaired after the worst one; `0` = the worst path only                                                                                |
+| `SWAP_LAST_GASP`   | no (default: 1)   | Swap step: `0` skips the last-gasp round over the failing registers                                                                                                                  |
+| `SWAP_REPAIRS`     | no (default: 1)   | Swap step: cells switched per pass on the worst paths                                                                                                                                |
+| `IO_DELAY_PCT`     | no (default: 0)   | Swap step: input/output delay on the data ports, percent of the period                                                                                                               |
+| `SDC`              | no                | Swap step: project constraint file sourced after the generated constraints (timing budget)                                                                                           |
 
 Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`.
 
@@ -284,20 +294,21 @@ Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`.
 | `KEEP_MODULES`     | listed modules only, flat inside each | top + listed modules              |
 | `BLACKBOX_MODULES` | one shared module per listed name     | top + one entry per linked module |
 
-The netlist of the BLACKBOX_MODULES is read from `imp/<mod>_syn/output/netlist.v` (or, failing that, `imp/<mod>/output/netlist.v`) and the run fails if neither exists — so name the block's own synthesis run `OUT_DIR=<mod>_syn`. A linked module is not resynthesized, so its area is exactly the one from its own run — rerun the first pass after changing its RTL.
+The netlist of the BLACKBOX_MODULES is read from `imp/<mod>_syn/output/netlist.v` (or, failing that, `imp/<mod>/output/netlist.v`) and the run fails if neither exists — so name the block's own synthesis run `OUT_DIR=<mod>_syn`. With `VT_SWAP=1`, `imp/<mod>_vt_syn/output/netlist.v` comes first, so name a block's swapped run `OUT_DIR=<mod>_vt_syn`. A linked module is not resynthesized, so its area is exactly the one from its own run — rerun the first pass after changing its RTL.
 
 ### Post-synthesis static timing analysis (OpenSTA)
 
 ```bash
-make post-syn-sta TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir>
+make post-syn-sta TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir> [VT_SWAP=1]
 ```
 
-| Parameter       | Required | Description                                                  |
-| --------------- | -------- | ------------------------------------------------------------ |
-| `TOP_LEVEL`     | yes      | RTL module name                                              |
-| `CLK_PERIOD_NS` | yes      | Clock period in nanoseconds                                  |
-| `OUT_DIR`       | yes      | Output subdirectory under `imp/`                             |
-| `NETLIST_DIR`   | yes      | Directory containing the synthesized netlist from `make syn` |
+| Parameter       | Required | Description                                                                           |
+| --------------- | -------- | ------------------------------------------------------------------------------------- |
+| `TOP_LEVEL`     | yes      | RTL module name                                                                       |
+| `CLK_PERIOD_NS` | yes      | Clock period in nanoseconds                                                           |
+| `OUT_DIR`       | yes      | Output subdirectory under `imp/`                                                      |
+| `NETLIST_DIR`   | yes      | Directory containing the synthesized netlist from `make syn`                          |
+| `VT_SWAP`       | no       | `1` also loads the LVT and SLVT libraries, for a netlist from a `VT_SWAP=1` synthesis |
 
 Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`.
 

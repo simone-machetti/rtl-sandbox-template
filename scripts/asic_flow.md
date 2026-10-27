@@ -1,6 +1,6 @@
 # ASIC Design Flow
 
-The complete open-source ASIC flow of this repository, step by step: the tool that implements each step, its inputs and its outputs. Every step is a `make` target (see the root [README.md](../README.md) for commands and parameters); all paths follow the repository conventions (`projects/<project>/imp|sim/<OUT_DIR>/{output,report}`). Technology: ASAP7 (7 nm predictive PDK, RVT, TT corner), block-level implementation (pins on routing layers, no pad ring, single power domain). Every technology-dependent step reads the cell library from `ASAP7_HOME` (`$PDK_HOME/vendor/asap7`); place-and-route reads the metal stack from `BEOL_HOME`, selected with `BEOL=<name>` (`asap7` by default, the stock stack).
+The complete open-source ASIC flow of this repository, step by step: the tool that implements each step, its inputs and its outputs. Every step is a `make` target (see the root [README.md](../README.md) for commands and parameters); all paths follow the repository conventions (`projects/<project>/imp|sim/<OUT_DIR>/{output,report}`). Technology: ASAP7 (7 nm predictive PDK, RVT with optional LVT/SLVT swaps in synthesis, TT corner), block-level implementation (pins on routing layers, no pad ring, single power domain). Every technology-dependent step reads the cell library from `ASAP7_HOME` (`$PDK_HOME/vendor/asap7`); place-and-route reads the metal stack from `BEOL_HOME`, selected with `BEOL=<name>` (`asap7` by default, the stock stack).
 
 ## SIM — Verilator
 
@@ -18,26 +18,28 @@ Pre-synthesis functional simulation (`make sim`).
 - Simulation binary + logs (`compile.log`, `run.log`)
 - Switching activity `.vcd` (with `VCD=1`)
 
-## SYN — Yosys (yosys-slang frontend, ABC mapper)
+## SYN — Yosys (yosys-slang frontend, ABC mapper), optional OpenROAD threshold-voltage swap
 
-Logic synthesis to the ASAP7 standard-cell library (`make syn`).
+Logic synthesis to the ASAP7 standard-cell library (`make syn`). With `VT_SWAP=1`, a component run continues in OpenROAD: high-fanout nets are buffered and the cells of failing paths are swapped to LVT or SLVT.
 
 **Inputs**
 
 - RTL files `.sv`
-- Library of cells `.lib` (Liberty, five ASAP7 NLDM RVT TT groups: SEQ, SIMPLE, INVBUF, AO, OA)
+- Library of cells `.lib` (Liberty, five ASAP7 NLDM RVT TT groups: SEQ, SIMPLE, INVBUF, AO, OA; with `VT_SWAP=1` also LVT and SLVT)
 - Latch technology map `.v` (`$ASAP7_HOME/yoSys/cells_latch_R.v`)
-- Previously synthesized netlists `imp/<mod>/output/netlist.v` (blackbox linking)
+- Previously synthesized netlists `imp/<mod>/output/netlist.v` (blackbox linking; `imp/<mod>_vt_syn/` first with `VT_SWAP=1`)
 - Delay target for the ABC mapper, derived from `CLK_PERIOD_NS` (the resolved ABC script is archived as `output/abc.script`)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `OUT_DIR` (required); `CLK_PERIOD_NS`, `PARAMS`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `LINK_BLACKBOXES` (optional)
+- With `VT_SWAP=1` only: physical views `.lef` (technology LEF, R/L/SL cell LEFs), wire RC, a project timing budget `SDC`
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `OUT_DIR` (required); `CLK_PERIOD_NS`, `PARAMS`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `LINK_BLACKBOXES`, `VT_SWAP`, `FANOUT_BUF`, `BUF_OUTPUTS`, `SWAP_TNS`, `SWAP_LAST_GASP`, `SWAP_REPAIRS`, `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 
-- Post-syn netlist `.v` (`output/netlist.v`)
-- Synthesis log (`output/yosys.log`)
+- Post-syn netlist `.v` (`output/netlist.v`; with `VT_SWAP=1` the swapped netlist, the Yosys one kept as `output/netlist_rvt.v`)
+- Synthesis log (`output/yosys.log`; `output/openroad.log` with `VT_SWAP=1`)
 - Area report (`report/area.rpt`)
+- Swap report (`report/vt_swap.rpt`, `VT_SWAP=1` only)
 
-Note: the clock period enters synthesis only as the ABC delay target (ABC's mapper is delay-oriented by default, so the target mainly documents intent); timing/power reports come from POST-SYN-STA/DPA.
+Note: the clock period enters synthesis as the ABC delay target (ABC's mapper is delay-oriented by default, so the target mainly documents intent) and, with `VT_SWAP=1`, as the swap step's clock; timing/power reports come from POST-SYN-STA/DPA.
 
 ## POST-SYN-SIM — Verilator
 
@@ -62,9 +64,9 @@ Static timing analysis of the synthesized netlist, ideal wires and ideal clocks 
 **Inputs**
 
 - Post-syn netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty, RVT; with `VT_SWAP=1` also LVT and SLVT)
 - Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with I/O delays from `IO_DELAY_PCT` (default zero) or a project `SDC` file, hold false-pathed on I/O
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `IO_DELAY_PCT`, `SDC` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `IO_DELAY_PCT`, `SDC`, `VT_SWAP` (optional)
 
 **Outputs**
 

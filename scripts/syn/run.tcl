@@ -13,13 +13,17 @@ source $env(REPO_HOME)/scripts/syn/compile.tcl
 # -----------------------------------------------------------------------------
 set imp_dir "$env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp"
 
-# Resolve a blackboxed module's netlist: prefer imp/<mod>_syn/, fall back to imp/<mod>/
+# Resolve a blackboxed module's netlist: prefer imp/<mod>_vt_syn/ when VT_SWAP is set, then imp/<mod>_syn/, then imp/<mod>/
 proc bb_netlist {imp_dir mod} {
-    foreach dir [list ${mod}_syn $mod] {
+    set dirs [list ${mod}_syn $mod]
+    if {$::env(SEL_VT_SWAP) ne "0"} {
+        set dirs [linsert $dirs 0 ${mod}_vt_syn]
+    }
+    foreach dir $dirs {
         set f "$imp_dir/$dir/output/netlist.v"
         if {[file exists $f]} { return $f }
     }
-    error "BLACKBOX_MODULES: netlist for '$mod' not found (looked in imp/${mod}_syn/ and imp/$mod/) - synthesize it first"
+    error "BLACKBOX_MODULES: netlist for '$mod' not found (looked in imp/[join $dirs {/, imp/}]/) - synthesize it first"
 }
 
 foreach mod $blackbox_modules {
@@ -145,12 +149,16 @@ if {$env(SEL_LINK_BLACKBOXES) ne "0"} {
 # -----------------------------------------------------------------------------
 # Generate hierarchical area report
 # -----------------------------------------------------------------------------
+set vt_stat ""
+foreach lib $vt_libs {
+    append vt_stat " -liberty $lib"
+}
 yosys "tee -o $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/report/area.rpt stat -hierarchy \
     -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib \
     -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib \
     -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
     -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib"
+    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib$vt_stat"
 
 # -----------------------------------------------------------------------------
 # Flatten full design, optimize and clean for netlist output
