@@ -259,29 +259,32 @@ Outputs go to `projects/<PROJECT>/sim/<OUT_DIR>/`.
 ### Logic synthesis (Yosys + ABC, ASAP7 target)
 
 ```bash
-make syn TOP_LEVEL=<top_level> OUT_DIR=<name> [CLK_PERIOD_NS=<val>] [PARAMS="KEY=VAL ..."] \
+make syn TOP_LEVEL=<top_level> OUT_DIR=<name> [CLK_PERIOD_NS=<val>] [CORNER=<TT|FF|SS>] [SETUP_MARGIN_PCT=<pct>] [DERATE=<val>] [PARAMS="KEY=VAL ..."] \
     [KEEP_HIERARCHY=1] [KEEP_MODULES="mod ..."] [BLACKBOX_MODULES="mod ..."] [LINK_BLACKBOXES=0] \
     [VT_SWAP=1] [FANOUT_BUF=<n>] [BUF_OUTPUTS=1] [SWAP_TNS=<pct>] [SWAP_LAST_GASP=0] [SWAP_REPAIRS=<n>] [IO_DELAY_PCT=<pct>] [SDC=<file>]
 ```
 
-| Parameter          | Required          | Description                                                                                                                                                                          |
-| ------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `TOP_LEVEL`        | yes               | RTL module to synthesize; can be any module in the hierarchy                                                                                                                         |
-| `OUT_DIR`          | yes               | Output subdirectory under `imp/`                                                                                                                                                     |
-| `CLK_PERIOD_NS`    | no (default: 1.0) | Delay target for the ABC mapper (resolved script saved as `output/abc.script`); clock of the swap step                                                                               |
-| `PARAMS`           | no                | Project-specific RTL elaboration parameters                                                                                                                                          |
-| `KEEP_HIERARCHY`   | no (default: 0)   | Preserve every module boundary in the netlist (skips `flatten`)                                                                                                                      |
-| `KEEP_MODULES`     | no                | Preserve only the listed module boundaries and flatten below them                                                                                                                    |
-| `BLACKBOX_MODULES` | no                | Do not elaborate the listed modules; link their netlists from an earlier run                                                                                                         |
-| `LINK_BLACKBOXES`  | no (default: 1)   | `0` keeps the blackboxed modules as empty stubs for hierarchical `make pnr`                                                                                                          |
-| `VT_SWAP`          | no (default: 0)   | `1` = after Yosys, OpenROAD buffers high-fanout nets and swaps failing paths to LVT/SLVT (runs without `BLACKBOX_MODULES`); with `BLACKBOX_MODULES`, links `imp/<mod>_vt_syn/` first |
-| `FANOUT_BUF`       | no (default: 16)  | Swap step: input nets above this fanout get a root buffer before repair                                                                                                              |
-| `BUF_OUTPUTS`      | no (default: 0)   | Swap step: `1` adds one buffer per output port                                                                                                                                       |
-| `SWAP_TNS`         | no (default: 100) | Swap step: share (%) of the failing registers repaired after the worst one; `0` = the worst path only                                                                                |
-| `SWAP_LAST_GASP`   | no (default: 1)   | Swap step: `0` skips the last-gasp round over the failing registers                                                                                                                  |
-| `SWAP_REPAIRS`     | no (default: 1)   | Swap step: cells switched per pass on the worst paths                                                                                                                                |
-| `IO_DELAY_PCT`     | no (default: 0)   | Swap step: input/output delay on the data ports, percent of the period                                                                                                               |
-| `SDC`              | no                | Swap step: project constraint file sourced after the generated constraints (timing budget)                                                                                           |
+| Parameter          | Required          | Description                                                                                                                                                                                                                               |
+| ------------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TOP_LEVEL`        | yes               | RTL module to synthesize; can be any module in the hierarchy                                                                                                                                                                              |
+| `OUT_DIR`          | yes               | Output subdirectory under `imp/`                                                                                                                                                                                                          |
+| `CLK_PERIOD_NS`    | no (default: 1.0) | Delay target for the ABC mapper (resolved script saved as `output/abc.script`); clock of the swap step                                                                                                                                    |
+| `CORNER`           | no (default: TT)  | Liberty corner of the mapping, the area report and the swap step: `TT`, `FF` or `SS`                                                                                                                                                      |
+| `SETUP_MARGIN_PCT` | no (default: 0)   | Setup margin, percent of the period: ABC maps for the period × (1 − margin) / `DERATE`, and the swap step applies it as setup clock uncertainty                                                                                           |
+| `DERATE`           | no (default: 1.0) | Late derate on cell and net delays: divides ABC's delay target, and the swap step times with derated delays                                                                                                                               |
+| `PARAMS`           | no                | Project-specific RTL elaboration parameters                                                                                                                                                                                               |
+| `KEEP_HIERARCHY`   | no (default: 0)   | Preserve every module boundary in the netlist (skips `flatten`)                                                                                                                                                                           |
+| `KEEP_MODULES`     | no                | Preserve only the listed module boundaries and flatten below them                                                                                                                                                                         |
+| `BLACKBOX_MODULES` | no                | Do not elaborate the listed modules; link their netlists from an earlier run                                                                                                                                                              |
+| `LINK_BLACKBOXES`  | no (default: 1)   | `0` keeps the blackboxed modules as empty stubs for hierarchical `make pnr`                                                                                                                                                               |
+| `VT_SWAP`          | no (default: 0)   | `1` = after Yosys, OpenROAD buffers high-fanout nets and swaps failing paths to LVT/SLVT; with `BLACKBOX_MODULES`, links `imp/<mod>_vt_syn/` first and then sizes and swaps only the parent's own cells, the linked modules left as built |
+| `FANOUT_BUF`       | no (default: 16)  | Swap step: input nets above this fanout get a root buffer before repair                                                                                                                                                                   |
+| `BUF_OUTPUTS`      | no (default: 0)   | Swap step: `1` adds one buffer per output port                                                                                                                                                                                            |
+| `SWAP_TNS`         | no (default: 100) | Swap step: share (%) of the failing registers repaired after the worst one; `0` = the worst path only                                                                                                                                     |
+| `SWAP_LAST_GASP`   | no (default: 1)   | Swap step: `0` skips the last-gasp round over the failing registers                                                                                                                                                                       |
+| `SWAP_REPAIRS`     | no (default: 1)   | Swap step: cells switched per pass on the worst paths                                                                                                                                                                                     |
+| `IO_DELAY_PCT`     | no (default: 0)   | Swap step: input/output delay on the data ports, percent of the period                                                                                                                                                                    |
+| `SDC`              | no                | Swap step: project constraint file sourced after the generated constraints (timing budget)                                                                                                                                                |
 
 Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`.
 
@@ -299,16 +302,20 @@ The netlist of the BLACKBOX_MODULES is read from `imp/<mod>_syn/output/netlist.v
 ### Post-synthesis static timing analysis (OpenSTA)
 
 ```bash
-make post-syn-sta TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir> [VT_SWAP=1]
+make post-syn-sta TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir> [VT_SWAP=1] \
+    [CORNER=<TT|FF|SS>] [SETUP_MARGIN_PCT=<pct>] [DERATE=<val>]
 ```
 
-| Parameter       | Required | Description                                                                           |
-| --------------- | -------- | ------------------------------------------------------------------------------------- |
-| `TOP_LEVEL`     | yes      | RTL module name                                                                       |
-| `CLK_PERIOD_NS` | yes      | Clock period in nanoseconds                                                           |
-| `OUT_DIR`       | yes      | Output subdirectory under `imp/`                                                      |
-| `NETLIST_DIR`   | yes      | Directory containing the synthesized netlist from `make syn`                          |
-| `VT_SWAP`       | no       | `1` also loads the LVT and SLVT libraries, for a netlist from a `VT_SWAP=1` synthesis |
+| Parameter          | Required          | Description                                                                                         |
+| ------------------ | ----------------- | --------------------------------------------------------------------------------------------------- |
+| `TOP_LEVEL`        | yes               | RTL module name                                                                                     |
+| `CLK_PERIOD_NS`    | yes               | Clock period in nanoseconds                                                                         |
+| `OUT_DIR`          | yes               | Output subdirectory under `imp/`                                                                    |
+| `NETLIST_DIR`      | yes               | Directory containing the synthesized netlist from `make syn`                                        |
+| `VT_SWAP`          | no                | `1` also loads the LVT and SLVT libraries, for a netlist from a `VT_SWAP=1` synthesis               |
+| `CORNER`           | no (default: TT)  | Liberty corner of the analysis: `TT`, `FF` or `SS`                                                  |
+| `SETUP_MARGIN_PCT` | no (default: 0)   | Setup clock uncertainty, percent of the period (the budget of a `make syn` run with the same value) |
+| `DERATE`           | no (default: 1.0) | Late derate on cell and net delays                                                                  |
 
 Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`.
 
@@ -316,7 +323,7 @@ Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`.
 
 ```bash
 make post-syn-sim TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir> \
-    [TB=<testbench>] [PARAMS="KEY=VAL ..."] [VCD=1]
+    [TB=<testbench>] [PARAMS="KEY=VAL ..."] [VCD=1] [VT_SWAP=1]
 ```
 
 | Parameter       | Required | Description                                                                                          |
@@ -329,6 +336,7 @@ make post-syn-sim TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLI
 | `PARAMS`        | no       | Project-specific RTL elaboration parameters                                                          |
 | `VCD`           | no       | `1` dumps `activity.vcd`; default `0`. Required by `post-syn-dpa`                                    |
 | `BUILD_JOBS`    | no       | Parallel compile jobs for Verilator; default `0`, every core. Lower it on a large gate-level netlist |
+| `VT_SWAP`       | no       | `1` simulates the LVT and SLVT cells of a netlist from a `VT_SWAP=1` synthesis with the RVT models   |
 
 Outputs go to `projects/<PROJECT>/sim/<OUT_DIR>/`. Compiles the testbench with the `POST_SYN_SIM` compile-time flag, which the bench uses to instantiate the synthesized netlist instead of the RTL. Synthesis flattens unpacked array ports into single vectors and drops parameters, so a bench that drives such a top-level needs a `POST_SYN_SIM` branch that instantiates the DUT without parameters and wires the flat ports.
 
@@ -338,20 +346,22 @@ The ASAP7 sequential cells are read from `scripts/post-syn-sim/asap7_seq_behav.v
 
 ```bash
 make post-syn-dpa TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir> VCD_DIR=<vcd_dir> \
-    [TB=<testbench>] [KEEP_HIERARCHY=1] [KEEP_MODULES="mod ..."] [BLACKBOX_MODULES="mod ..."]
+    [TB=<testbench>] [KEEP_HIERARCHY=1] [KEEP_MODULES="mod ..."] [BLACKBOX_MODULES="mod ..."] [VT_SWAP=1] [CORNER=<TT|FF|SS>]
 ```
 
-| Parameter          | Required        | Description                                                                       |
-| ------------------ | --------------- | --------------------------------------------------------------------------------- |
-| `TOP_LEVEL`        | yes             | RTL module name                                                                   |
-| `CLK_PERIOD_NS`    | yes             | Clock period in nanoseconds                                                       |
-| `OUT_DIR`          | yes             | Output subdirectory under `imp/`                                                  |
-| `NETLIST_DIR`      | yes             | Directory containing the synthesized netlist from `make syn`                      |
-| `VCD_DIR`          | yes             | Directory containing `activity.vcd` from `make post-syn-sim VCD=1`                |
-| `TB`               | no              | Testbench module the VCD was dumped from; default `tb_<top_level>`                |
-| `KEEP_HIERARCHY`   | no (default: 0) | Also generate `power_hierarchy.rpt` with a per-instance breakdown                 |
-| `KEEP_MODULES`     | no              | Same effect as `KEEP_HIERARCHY=1` on the report; pass the value used at synthesis |
-| `BLACKBOX_MODULES` | no              | Same effect as `KEEP_HIERARCHY=1` on the report; pass the value used at synthesis |
+| Parameter          | Required         | Description                                                                           |
+| ------------------ | ---------------- | ------------------------------------------------------------------------------------- |
+| `TOP_LEVEL`        | yes              | RTL module name                                                                       |
+| `CLK_PERIOD_NS`    | yes              | Clock period in nanoseconds                                                           |
+| `OUT_DIR`          | yes              | Output subdirectory under `imp/`                                                      |
+| `NETLIST_DIR`      | yes              | Directory containing the synthesized netlist from `make syn`                          |
+| `VCD_DIR`          | yes              | Directory containing `activity.vcd` from `make post-syn-sim VCD=1`                    |
+| `TB`               | no               | Testbench module the VCD was dumped from; default `tb_<top_level>`                    |
+| `KEEP_HIERARCHY`   | no (default: 0)  | Also generate `power_hierarchy.rpt` with a per-instance breakdown                     |
+| `KEEP_MODULES`     | no               | Same effect as `KEEP_HIERARCHY=1` on the report; pass the value used at synthesis     |
+| `BLACKBOX_MODULES` | no               | Same effect as `KEEP_HIERARCHY=1` on the report; pass the value used at synthesis     |
+| `VT_SWAP`          | no               | `1` also loads the LVT and SLVT libraries, for a netlist from a `VT_SWAP=1` synthesis |
+| `CORNER`           | no (default: TT) | Liberty corner of the power tables: `TT`, `FF` or `SS`                                |
 
 Outputs go to `projects/<PROJECT>/imp/<OUT_DIR>/`. The VCD is annotated onto the scope `<TB>/dut`, so the testbench must name its DUT instance `dut`. `report/vcd_annotated.rpt` and `report/vcd_unannotated.rpt` list how many pins were annotated — a low count means the scope did not match and the power numbers are estimates, not measurements.
 
@@ -362,7 +372,7 @@ The per-instance report needs a netlist with module boundaries, so pass the same
 ```bash
 make pnr TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<netlist_dir> \
     [CORE_UTIL=<pct>] [ASPECT_RATIO=<val>] [CORE_MARGIN=<um>] [PLACE_DENSITY=<val>] [CELL_PAD=<sites>] [INIT_DENSITY_PENALTY=<val>] \
-    [MAX_ROUTE_LAYER=<layer>] [MIN_CLK_LAYER=<layer>] [CLK_UNCERTAINTY_PS=<val>] [PNR_STEP=<stage>] [PNR_THREADS=<n>] [PNR_REPAIR=0] [ALLOW_CONGESTION=1] [DROUTE_END_ITER=<n>] \
+    [MAX_ROUTE_LAYER=<layer>] [MIN_CLK_LAYER=<layer>] [CLK_UNCERTAINTY_PS=<val>] [CORNER=<TT|FF|SS>] [PNR_STEP=<stage>] [PNR_THREADS=<n>] [PNR_REPAIR=0] [ALLOW_CONGESTION=1] [DROUTE_END_ITER=<n>] \
     [MACRO_DIRS="dir ..."] [FLOORPLAN=<file>] [MACRO_CHANNEL=<um>] [MACRO_CHANNEL_Y=<um>] [PDN=<file>] \
     [PINS=<file>] [PIN_LAYERS_HOR="layer ..."] [PIN_LAYERS_VER="layer ..."] [PIN_ARGS="flags"] [IO_DELAY_PCT=<pct>] [SDC=<file>]
 ```
@@ -382,6 +392,7 @@ make pnr TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<n
 | `MAX_ROUTE_LAYER`      | no (default: M7)   | Top signal-routing layer; `M5` when hardening a tile (with the tile PDN) so M6/M7 stay free for the parent; `M4` on the `smic-n3` stack                                  |
 | `MIN_CLK_LAYER`        | no (default: M4)   | Lowest clock-routing layer; must lie below `MAX_ROUTE_LAYER`, so `M3` for a tile capped at `M4`                                                                          |
 | `CLK_UNCERTAINTY_PS`   | no (default: 0)    | Clock uncertainty in picoseconds                                                                                                                                         |
+| `CORNER`               | no (default: TT)   | Liberty corner of every stage: `TT`, `FF` or `SS` (RVT cells)                                                                                                            |
 | `PNR_STEP`             | no (default: all)  | `all` = full clean run; a stage name re-runs only that stage                                                                                                             |
 | `PNR_THREADS`          | no (default: 0)    | OpenROAD thread count; `0` = all cores                                                                                                                                   |
 | `PNR_REPAIR`           | no (default: 1)    | `0` skips design and timing repair (routability-only run: no buffering/sizing, single global route)                                                                      |
@@ -418,7 +429,7 @@ The `post-pnr-*` steps take the same `MACRO_DIRS`: STA uses the blocks' timing m
 ### Post-place-and-route static timing analysis (OpenSTA)
 
 ```bash
-make post-pnr-sta TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<pnr_dir> [MACRO_DIRS="dir ..."]
+make post-pnr-sta TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<pnr_dir> [MACRO_DIRS="dir ..."] [CORNER=<TT|FF|SS>]
 ```
 
 Same interface and reports as `make post-syn-sta`, but `NETLIST_DIR` points at a `make pnr` run: the routed `netlist.v` is linked and `netlist.spef` is read, so timing is parasitics-accurate with propagated clocks.
@@ -436,7 +447,7 @@ Same interface and testbench conventions as `make post-syn-sim` (including the `
 
 ```bash
 make post-pnr-dpa TOP_LEVEL=<top_level> CLK_PERIOD_NS=<val> OUT_DIR=<name> NETLIST_DIR=<pnr_dir> VCD_DIR=<vcd_dir> \
-    [TB=<testbench>] [MACRO_DIRS="dir ..."]
+    [TB=<testbench>] [MACRO_DIRS="dir ..."] [CORNER=<TT|FF|SS>]
 ```
 
 Same interface as `make post-syn-dpa`, but `NETLIST_DIR` points at a `make pnr` run: the routed netlist and `netlist.spef` are read, so power is parasitics-accurate. With `MACRO_DIRS`, the hardened blocks are analyzed in full and `power_macros.rpt` reports each macro's in-system power.
@@ -468,6 +479,9 @@ make clean-all                # remove all sim/ and imp/ directories
 | `TOP_LEVEL`            | all except init and clean-*     | module name                       | RTL module to build/simulate; can be any module in the hierarchy                                            |
 | `TB`                   | sim, post-*-sim, post-*-dpa     | testbench module name             | Testbench to run (default `tb_$(TOP_LEVEL)`)                                                                |
 | `CLK_PERIOD_NS`        | all except init and clean-*     | e.g. `1.0`                        | Clock period in nanoseconds (for `syn`: the ABC delay target, default `1.0`)                                |
+| `CORNER`               | all but sim and post-*-sim      | `TT` (default), `FF`, `SS`        | Liberty corner every timing and power step reads (ASAP7 RVT, LVT and SLVT sets)                             |
+| `SETUP_MARGIN_PCT`     | syn, post-syn-sta               | percent (default: `0`)            | Setup clock uncertainty as a share of the period (swap step and post-syn STA; lowers ABC's delay target)    |
+| `DERATE`               | syn, post-syn-sta               | factor (default: `1.0`)           | Late derate on cell and net delays (swap step and post-syn STA; lowers ABC's delay target)                  |
 | `OUT_DIR`              | all except clean-all            | directory name                    | Output subdirectory under `sim/` or `imp/`                                                                  |
 | `NETLIST_DIR`          | pnr, post-syn-*, post-pnr-*     | e.g. `syn_top_example`            | Netlist run to consume (`make syn` for pnr/post-syn-*, `make pnr` for post-pnr-*)                           |
 | `VCD_DIR`              | post-syn-dpa, post-pnr-dpa      | e.g. `sim_top_example`            | Directory containing `activity.vcd` from the matching gate-level simulation                                 |

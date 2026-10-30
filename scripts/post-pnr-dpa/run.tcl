@@ -6,13 +6,20 @@
 set REPORT_DIR $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/report
 
 # -----------------------------------------------------------------------------
-# Libraries (timing/power models)
+# Libraries (timing/power models of the selected corner)
 # -----------------------------------------------------------------------------
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
+
+set CORNER $env(SEL_CORNER)
+read_liberty [lib_file asap7sc7p5t_SEQ_RVT_${CORNER}_nldm_220123]
+read_liberty [lib_file asap7sc7p5t_SIMPLE_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_INVBUF_RVT_${CORNER}_nldm_220122]
+read_liberty [lib_file asap7sc7p5t_AO_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_OA_RVT_${CORNER}_nldm_211120]
 
 # -----------------------------------------------------------------------------
 # Netlist & top-level linking

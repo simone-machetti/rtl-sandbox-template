@@ -27,6 +27,14 @@ if [ "${SEL_VCD:-0}" = "1" ]; then
     trace_flags=(--trace --trace-underscore --trace-max-array 0 --trace-max-width 0 -DVCD)
 fi
 
+NETLIST="${PROJ}/imp/${SEL_NETLIST_DIR}/output/netlist.v"
+if [ "${SEL_VT_SWAP:-0}" != "0" ]; then
+    sed -E "s/_ASAP7_75t_(L|SL)\b/_ASAP7_75t_R/g; s/\(one_\)/(1'b1)/g; s/\(zero_\)/(1'b0)/g" \
+        "${NETLIST}" > "${SIM}/build/netlist.v"
+    NETLIST="${SIM}/build/netlist.v"
+fi
+export SEL_SIM_NETLIST="${NETLIST}"
+
 verilator \
     -sv \
     --build-jobs "${SEL_BUILD_JOBS}" \

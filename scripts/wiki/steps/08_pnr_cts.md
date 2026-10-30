@@ -91,7 +91,7 @@ The tree's buffers and repair's cells are legalized into the rows, the invariant
 - **Tree topology**: buffered clustered trees (here) vs H-trees/fishbones (regular, low-skew, higher power) vs **clock meshes** (shorted grid — lowest skew, highest power, standard for CPUs).
 - **Clock routing rules**: production flows route clocks with widened/shielded wires (NDRs — non-default rules) for SI immunity; this flow's clock nets use standard rules on the restricted layer window ([09_pnr_route.md](09_pnr_route.md): clock min-layer M4).
 - **ICG sizing**: with `ICG*` blacklisted the resizer cannot up-size an overloaded clock gate (the library offers a full size family); a design whose gated-clock nets fail repair would motivate relaxing that entry for this stage.
-- **Multi-corner CTS**: balancing trees across corners is the signoff-grade refinement; single-corner TT here.
+- **Multi-corner CTS**: balancing trees across corners is the signoff-grade refinement; one corner per run here (`CORNER`, TT by default).
 
 ## Knobs
 

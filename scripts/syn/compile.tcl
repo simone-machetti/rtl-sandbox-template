@@ -14,25 +14,32 @@ yosys "design -reset"
 yosys "plugin -i $env(YOSYS_SLANG_HOME)/bin/slang.so"
 
 # -----------------------------------------------------------------------------
-# Read libraries to Yosys database
+# Read libraries of the selected corner to Yosys database
 # -----------------------------------------------------------------------------
-yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib"
-yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib"
-yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib"
-yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib"
-yosys "read_liberty -lib $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib"
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
 
+proc vt_lib_files {vt} {
+    set c $::env(SEL_CORNER)
+    return [list \
+        [lib_file asap7sc7p5t_SEQ_${vt}_${c}_nldm_220123] \
+        [lib_file asap7sc7p5t_SIMPLE_${vt}_${c}_nldm_211120] \
+        [lib_file asap7sc7p5t_INVBUF_${vt}_${c}_nldm_220122] \
+        [lib_file asap7sc7p5t_AO_${vt}_${c}_nldm_211120] \
+        [lib_file asap7sc7p5t_OA_${vt}_${c}_nldm_211120]]
+}
+
+set rvt_libs [vt_lib_files RVT]
 set vt_libs {}
 if {$env(SEL_VT_SWAP) ne "0"} {
     foreach vt {LVT SLVT} {
-        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_${vt}_TT_nldm_220123.lib
-        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_${vt}_TT_nldm_211120.lib.gz
-        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_${vt}_TT_nldm_220122.lib.gz
-        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_${vt}_TT_nldm_211120.lib.gz
-        lappend vt_libs $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_${vt}_TT_nldm_211120.lib.gz
+        set vt_libs [concat $vt_libs [vt_lib_files $vt]]
     }
 }
-foreach lib $vt_libs {
+foreach lib [concat $rvt_libs $vt_libs] {
     yosys "read_liberty -lib $lib"
 }
 

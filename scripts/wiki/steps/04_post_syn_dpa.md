@@ -7,10 +7,10 @@ Power estimation from real switching activity: the gate-level simulation's VCD i
 **Inputs**
 
 - Post-syn netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT; with `VT_SWAP=1` also LVT and SLVT)
 - Post-syn switching activity `.vcd` (annotated onto scope `<TB>/dut`)
 - Constraints, generated inline (as in POST-SYN-STA)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `VT_SWAP`, `CORNER` (optional)
 
 **Outputs**
 
@@ -37,17 +37,30 @@ set REPORT_DIR $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/
 ```
 
 ```tcl
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
+
+set CORNER $env(SEL_CORNER)
+set vts {RVT}
+if {$env(SEL_VT_SWAP) ne "0"} {
+    lappend vts LVT SLVT
+}
+foreach vt $vts {
+    read_liberty [lib_file asap7sc7p5t_SEQ_${vt}_${CORNER}_nldm_220123]
+    read_liberty [lib_file asap7sc7p5t_SIMPLE_${vt}_${CORNER}_nldm_211120]
+    read_liberty [lib_file asap7sc7p5t_INVBUF_${vt}_${CORNER}_nldm_220122]
+    read_liberty [lib_file asap7sc7p5t_AO_${vt}_${CORNER}_nldm_211120]
+    read_liberty [lib_file asap7sc7p5t_OA_${vt}_${CORNER}_nldm_211120]
+}
 
 read_verilog $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_NETLIST_DIR)/output/netlist.v
 link_design $env(SEL_TOP_LEVEL)
 ```
 
-Liberty here serves double duty: the same files carry the *power* tables (internal energy, leakage) next to the timing tables.
+Liberty here serves double duty: the same files carry the *power* tables (internal energy, leakage) next to the timing tables, characterized per corner, so `CORNER` moves the power figures too (TT, the default, is the typical figure). A netlist from a `VT_SWAP=1` synthesis needs `VT_SWAP=1` here too, as in [03_post_syn_sta.md](03_post_syn_sta.md): its LVT and SLVT cells then get their own internal-energy and leakage tables, and the faster flavours leak markedly more than RVT. The activity comes from a simulation run with the same flag ([02_post_syn_sim.md](02_post_syn_sim.md)).
 
 ```tcl
 set CLK_PERIOD_PS [expr {$env(SEL_CLK_PERIOD_NS) * 1000}]
@@ -123,6 +136,8 @@ The summary table (internal/switching/leakage × sequential/combinational/clock/
 | `NETLIST_DIR` / `VCD_DIR`                          | make  | —                | The netlist and the activity trace to combine       |
 | `TB`                                               | make  | `tb_<top_level>` | Must match the bench that produced the VCD          |
 | `KEEP_HIERARCHY`/`KEEP_MODULES`/`BLACKBOX_MODULES` | make  | off              | Enables the per-instance report (match the syn run) |
+| `VT_SWAP`                                          | make  | 0                | `1` = also load LVT and SLVT (swapped netlists)     |
+| `CORNER`                                           | make  | TT               | Liberty corner of the power tables (TT, FF or SS)   |
 
 ## Notes and caveats
 

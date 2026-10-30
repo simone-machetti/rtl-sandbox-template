@@ -11,6 +11,9 @@ OUT_DIR              ?= no_name
 NETLIST_DIR          ?= no_name
 VCD_DIR              ?= no_name
 CLK_PERIOD_NS        ?= 1
+CORNER               ?= TT
+SETUP_MARGIN_PCT     ?= 0
+DERATE               ?= 1.0
 PARAMS               ?= none
 KEEP_HIERARCHY       ?= 0
 KEEP_MODULES         ?= none
@@ -63,6 +66,9 @@ export SEL_OUT_DIR              := $(OUT_DIR)
 export SEL_NETLIST_DIR          := $(NETLIST_DIR)
 export SEL_VCD_DIR              := $(VCD_DIR)
 export SEL_CLK_PERIOD_NS        := $(CLK_PERIOD_NS)
+export SEL_CORNER               := $(CORNER)
+export SEL_SETUP_MARGIN_PCT     := $(SETUP_MARGIN_PCT)
+export SEL_DERATE               := $(DERATE)
 export SEL_PARAMS               := $(PARAMS)
 export SEL_KEEP_HIERARCHY       := $(KEEP_HIERARCHY)
 export SEL_KEEP_MODULES         := $(KEEP_MODULES)
@@ -124,7 +130,7 @@ syn: clean-imp
 	mkdir -p $(PROJ_DIR)/imp/$(OUT_DIR)/output && \
 	mkdir -p $(PROJ_DIR)/imp/$(OUT_DIR)/report && \
 	yosys -l $(PROJ_DIR)/imp/$(OUT_DIR)/output/yosys.log -c $(REPO_HOME)/scripts/syn/run.tcl && \
-	if [ "$(VT_SWAP)" = "1" ] && [ "$(BLACKBOX_MODULES)" = "none" ]; then \
+	if [ "$(VT_SWAP)" = "1" ]; then \
 	openroad -no_init -exit $(REPO_HOME)/scripts/syn/vt_swap.tcl | tee $(PROJ_DIR)/imp/$(OUT_DIR)/output/openroad.log; \
 	fi
 

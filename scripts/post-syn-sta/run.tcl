@@ -7,22 +7,25 @@ set REPORT_DIR $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/
 file mkdir $REPORT_DIR
 
 # -----------------------------------------------------------------------------
-# Libraries (timing models)
+# Libraries (timing models of the selected corner)
 # -----------------------------------------------------------------------------
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
 
+set CORNER $env(SEL_CORNER)
+set vts {RVT}
 if {$env(SEL_VT_SWAP) ne "0"} {
-    foreach vt {LVT SLVT} {
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_${vt}_TT_nldm_220123.lib
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_${vt}_TT_nldm_211120.lib.gz
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_${vt}_TT_nldm_220122.lib.gz
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_${vt}_TT_nldm_211120.lib.gz
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_${vt}_TT_nldm_211120.lib.gz
-    }
+    lappend vts LVT SLVT
+}
+foreach vt $vts {
+    read_liberty [lib_file asap7sc7p5t_SEQ_${vt}_${CORNER}_nldm_220123]
+    read_liberty [lib_file asap7sc7p5t_SIMPLE_${vt}_${CORNER}_nldm_211120]
+    read_liberty [lib_file asap7sc7p5t_INVBUF_${vt}_${CORNER}_nldm_220122]
+    read_liberty [lib_file asap7sc7p5t_AO_${vt}_${CORNER}_nldm_211120]
+    read_liberty [lib_file asap7sc7p5t_OA_${vt}_${CORNER}_nldm_211120]
 }
 
 # -----------------------------------------------------------------------------
@@ -55,6 +58,14 @@ if {[llength $data_in] > 0} {
 if {[llength [all_outputs]] > 0} {
     set_output_delay $IO_DELAY_PS -clock vclk [all_outputs]
     set_false_path -hold -to [all_outputs]
+}
+
+set SETUP_MARGIN_PS [expr {$CLK_PERIOD_PS * $env(SEL_SETUP_MARGIN_PCT) / 100.0}]
+if {$SETUP_MARGIN_PS > 0} {
+    set_clock_uncertainty -setup $SETUP_MARGIN_PS [all_clocks]
+}
+if {$env(SEL_DERATE) != 1.0} {
+    set_timing_derate -late $env(SEL_DERATE)
 }
 
 if {$env(SEL_SDC) ne "none"} {

@@ -7,9 +7,9 @@ The first verification of the *netlist* rather than the RTL: the same self-check
 **Inputs**
 
 - Post-syn netlist `.v`
-- Functional models of cells `.v` (ASAP7 stdcell verilog + `scripts/post-syn-sim/asap7_seq_behav.v` for sequential cells)
+- Functional models of cells `.v` (ASAP7 stdcell verilog + `scripts/post-syn-sim/asap7_seq_behav.v` for sequential cells; with `VT_SWAP=1` the LVT and SLVT cells are simulated with these RVT models)
 - Testbench `.sv` (compiled with `POST_SYN_SIM`)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `TB`, `PARAMS`, `VCD` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `TB`, `PARAMS`, `VCD`, `VT_SWAP` (optional)
 
 **Outputs**
 
@@ -73,10 +73,26 @@ $(ASAP7_HOME)/verilog/stdcell/asap7sc7p5t_INVBUF_RVT_TT_201020.v
 $(ASAP7_HOME)/verilog/stdcell/asap7sc7p5t_SIMPLE_RVT_TT_201020.v
 $(ASAP7_HOME)/verilog/stdcell/asap7sc7p5t_OA_RVT_TT_201020.v
 
-$(REPO_HOME)/projects/$(SEL_PROJECT)/imp/$(SEL_NETLIST_DIR)/output/netlist.v
+$(SEL_SIM_NETLIST)
 ```
 
 Combinational cell models come from the platform tree (the OA group is absent from the OpenROAD-flow-scripts package; the platform repository's setup script copies it in from the ASU library repository). The first entry is the flow's own file: **`asap7_seq_behav.v`**, behavioral replacements for the *sequential* cells (flip-flops, ICG). They exist because the PDK's sequential models are built on Verilog-1995 UDP primitives ("user-defined primitives" — truth-table constructs) that Verilator does not implement and, worse, miscompiles silently — the flow substitutes ordinary behavioral `always` models with identical function. If sequential mapping ever emits a cell the file does not cover, its model must be added there.
+
+The last entry is the netlist, whose path `run.sh` sets before compiling:
+
+```bash
+NETLIST="${PROJ}/imp/${SEL_NETLIST_DIR}/output/netlist.v"
+if [ "${SEL_VT_SWAP:-0}" != "0" ]; then
+    sed -E "s/_ASAP7_75t_(L|SL)\b/_ASAP7_75t_R/g; s/\(one_\)/(1'b1)/g; s/\(zero_\)/(1'b0)/g" \
+        "${NETLIST}" > "${SIM}/build/netlist.v"
+    NETLIST="${SIM}/build/netlist.v"
+fi
+export SEL_SIM_NETLIST="${NETLIST}"
+```
+
+The platform ships Verilog views for the RVT cells only. A netlist from a `VT_SWAP=1` synthesis ([01_syn.md](01_syn.md)) also holds LVT (`_L`) and SLVT (`_SL`) cells, which differ from their RVT twins only in threshold voltage, so with `VT_SWAP=1` the simulation compiles a copy of the netlist with those cell types renamed to their RVT models. In a zero-delay simulation the threshold voltage has no effect, and instance and net names are untouched, so the `activity.vcd` of the copy annotates the real netlist in the power step ([04_post_syn_dpa.md](04_post_syn_dpa.md)), which loads all three libraries.
+
+The same copy restores the constant ties. OpenROAD writes a pin tied to a constant as a connection to a net named `one_` or `zero_` that no cell drives (in a Yosys netlist the same pin reads `1'h1`): the flip-flops' asynchronous set, for example, becomes `.SETN(one_)`. Timing and power analysis do not time those pins and are unaffected, but a simulator sees an undriven set input, which holds every flip-flop of the block at one. The copy connects those pins to `1'b1` and `1'b0` again.
 
 ## Design space
 
@@ -92,6 +108,7 @@ Combinational cell models come from the platform tree (the OA group is absent fr
 | `TB`          | make  | `tb_<top_level>` | Bench (must contain a `POST_SYN_SIM` branch)        |
 | `PARAMS`      | make  | none             | Bench-side parameters (the netlist itself has none) |
 | `VCD`         | make  | 0                | Dump `activity.vcd` — required by power analysis    |
+| `VT_SWAP`     | make  | 0                | `1` = simulate LVT/SLVT cells with the RVT models   |
 
 ## Notes and caveats
 

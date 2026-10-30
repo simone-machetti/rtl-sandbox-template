@@ -4,7 +4,7 @@ Constraints tell the timing engine what "fast enough" means: without them a netl
 
 ## Inputs and outputs
 
-- **Inputs**: `CLK_PERIOD_NS` (converted to ps), `IO_DELAY_PCT` and an optional project `SDC` file (every step), `CLK_UNCERTAINTY_PS` (P&R only); the linked design's port list.
+- **Inputs**: `CLK_PERIOD_NS` (converted to ps), `IO_DELAY_PCT` and an optional project `SDC` file (every step), `CLK_UNCERTAINTY_PS` (P&R only), `SETUP_MARGIN_PCT` and `DERATE` (synthesis swap and post-synthesis STA); the linked design's port list.
 - **Outputs**: clocks and I/O constraints in the timing engine's memory (and, from P&R, the as-implemented `output/design.sdc`).
 
 ## Theory
@@ -75,6 +75,20 @@ if {$::env(SEL_CLK_UNCERTAINTY_PS) > 0} {
 
 Optional margin (default 0 = off), applied to all clocks so I/O and internal checks stay consistent.
 
+The synthesis swap (`scripts/syn/vt_swap.tcl`) and post-synthesis STA (`scripts/post-syn-sta/run.tcl`) carry their own margin instead, right after the I/O delays:
+
+```tcl
+set SETUP_MARGIN_PS [expr {$CLK_PERIOD_PS * $env(SEL_SETUP_MARGIN_PCT) / 100.0}]
+if {$SETUP_MARGIN_PS > 0} {
+    set_clock_uncertainty -setup $SETUP_MARGIN_PS [all_clocks]
+}
+if {$env(SEL_DERATE) != 1.0} {
+    set_timing_derate -late $env(SEL_DERATE)
+}
+```
+
+`SETUP_MARGIN_PCT` reserves a share of the period for what synthesis does not see — clock skew after the tree is built, jitter, production uncertainty — as a setup-only uncertainty: the register's clock-to-output delay stays in each path's arrival and the library setup time is still subtracted, so the margin holds only skew and uncertainty. Hold is untouched, since hold is repaired only after CTS. `DERATE` multiplies every cell and net delay of the late (setup) analysis, the usual flat model of on-chip variation. Both default to off (0 and 1.0); together with `CORNER` they let the post-synthesis checks reproduce a target flow's budget, for instance a slow sign-off corner with derate and margin approximated by a faster corner here. ABC has neither notion, so synthesis maps against period × (1 − margin) / derate ([01_syn.md](../steps/01_syn.md)).
+
 ```tcl
 if {$::env(SEL_SDC) ne "none"} {
     set sdc_file $::env(SEL_SDC)
@@ -96,7 +110,7 @@ Two placement details of the scheme: in P&R the file is re-sourced after every c
 - **Multiple clocks.** The scheme is single-clock by convention; more clocks mean more `create_clock` lines plus `set_clock_groups -asynchronous` between unrelated domains — the analysis machinery is already capable.
 - **Environment realism.** `set_driving_cell` (input slew from a real driver instead of an ideal edge) and `set_load` (output pin capacitance) are the standard next-step refinements; without them boundary timing is slightly optimistic.
 - **Uncertainty policy.** Production flows use larger pre-CTS uncertainty (covering unknown skew) and shrink it post-CTS; the flow's single number is a simplification.
-- **Overconstraining** (`set_max_delay`, tighter-than-real periods) is a common tactic to bank margin during optimization; unused here — the delay target equals the analysis clock.
+- **Overconstraining** (`set_max_delay`, tighter-than-real periods) is a common tactic to bank margin during optimization; here `SETUP_MARGIN_PCT` and `DERATE` play that role in synthesis and its STA, and P&R keeps the analysis clock with `CLK_UNCERTAINTY_PS`.
 
 ## Knobs
 
@@ -104,6 +118,8 @@ Two placement details of the scheme: in P&R the file is re-sourced after every c
 | -------------------- | ----- | ------- | ------------------------------------------------------------------------ |
 | `CLK_PERIOD_NS`      | make  | 1.0     | The one timing target: every setup check, and P&R's optimization goal    |
 | `CLK_UNCERTAINTY_PS` | make  | 0       | Safety margin; ↑ = more pessimism, more repair effort, more area         |
+| `SETUP_MARGIN_PCT`   | make  | 0       | Setup-only uncertainty of the swap and post-syn STA, share of the period |
+| `DERATE`             | make  | 1.0     | Late derate of the swap and post-syn STA; ↑ = slower cell and net delays |
 | `IO_DELAY_PCT`       | make  | 0       | Uniform I/O budget as a share of the period (block-level hardening)      |
 | `SDC`                | make  | none    | Project constraint additions sourced last (per-port budgets, exceptions) |
 
@@ -112,7 +128,7 @@ Two placement details of the scheme: in P&R the file is re-sourced after every c
 - The clock port name `clk_i` is a flow-wide convention, hardcoded in the scheme; a design using another name gets treated as clockless.
 - Values are **picoseconds** in every command downstream of the one conversion.
 - The hold-false-path exclusion applies to I/O only; internal hold is fully analyzed and repaired after CTS.
-- The identical block is deliberately duplicated across the five consumer scripts (repository style favors self-contained scripts); a change to the scheme must be applied to all copies — the `IO_DELAY_PCT` and `SDC` additions are present in all five.
+- The identical block is deliberately duplicated across the five consumer scripts (repository style favors self-contained scripts); a change to the scheme must be applied to all copies — the `IO_DELAY_PCT` and `SDC` lines are present in all five. The `SETUP_MARGIN_PCT` and `DERATE` lines live only in the synthesis swap and post-synthesis STA.
 - P&R writes the effective constraints out as `output/design.sdc` — the ground truth of what a run was actually optimized against.
 
 ## Commercial perspective

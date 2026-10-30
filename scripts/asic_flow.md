@@ -20,17 +20,17 @@ Pre-synthesis functional simulation (`make sim`).
 
 ## SYN — Yosys (yosys-slang frontend, ABC mapper), optional OpenROAD threshold-voltage swap
 
-Logic synthesis to the ASAP7 standard-cell library (`make syn`). With `VT_SWAP=1`, a component run continues in OpenROAD: high-fanout nets are buffered and the cells of failing paths are swapped to LVT or SLVT.
+Logic synthesis to the ASAP7 standard-cell library (`make syn`). With `VT_SWAP=1`, the run continues in OpenROAD: high-fanout nets are buffered and the cells of failing paths are swapped to LVT or SLVT; a blackbox run keeps its linked components as built and sizes and swaps only its own cells.
 
 **Inputs**
 
 - RTL files `.sv`
-- Library of cells `.lib` (Liberty, five ASAP7 NLDM RVT TT groups: SEQ, SIMPLE, INVBUF, AO, OA; with `VT_SWAP=1` also LVT and SLVT)
+- Library of cells `.lib` (Liberty, five ASAP7 NLDM RVT groups of the `CORNER` (TT by default, FF or SS): SEQ, SIMPLE, INVBUF, AO, OA; with `VT_SWAP=1` also LVT and SLVT)
 - Latch technology map `.v` (`$ASAP7_HOME/yoSys/cells_latch_R.v`)
 - Previously synthesized netlists `imp/<mod>/output/netlist.v` (blackbox linking; `imp/<mod>_vt_syn/` first with `VT_SWAP=1`)
-- Delay target for the ABC mapper, derived from `CLK_PERIOD_NS` (the resolved ABC script is archived as `output/abc.script`)
+- Delay target for the ABC mapper, derived from `CLK_PERIOD_NS`, `SETUP_MARGIN_PCT` and `DERATE` (the resolved ABC script is archived as `output/abc.script`)
 - With `VT_SWAP=1` only: physical views `.lef` (technology LEF, R/L/SL cell LEFs), wire RC, a project timing budget `SDC`
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `OUT_DIR` (required); `CLK_PERIOD_NS`, `PARAMS`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `LINK_BLACKBOXES`, `VT_SWAP`, `FANOUT_BUF`, `BUF_OUTPUTS`, `SWAP_TNS`, `SWAP_LAST_GASP`, `SWAP_REPAIRS`, `IO_DELAY_PCT`, `SDC` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `OUT_DIR` (required); `CLK_PERIOD_NS`, `CORNER`, `SETUP_MARGIN_PCT`, `DERATE`, `PARAMS`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `LINK_BLACKBOXES`, `VT_SWAP`, `FANOUT_BUF`, `BUF_OUTPUTS`, `SWAP_TNS`, `SWAP_LAST_GASP`, `SWAP_REPAIRS`, `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 
@@ -48,9 +48,9 @@ Gate-level functional simulation of the synthesized netlist (`make post-syn-sim`
 **Inputs**
 
 - Post-syn netlist `.v`
-- Functional models of cells `.v` (ASAP7 stdcell verilog + `scripts/post-syn-sim/asap7_seq_behav.v` for sequential cells)
+- Functional models of cells `.v` (ASAP7 stdcell verilog + `scripts/post-syn-sim/asap7_seq_behav.v` for sequential cells; with `VT_SWAP=1` the LVT and SLVT cells are simulated with these RVT models)
 - Testbench `.sv` (compiled with `POST_SYN_SIM`)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `TB`, `PARAMS`, `VCD` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `TB`, `PARAMS`, `VCD`, `VT_SWAP` (optional)
 
 **Outputs**
 
@@ -64,9 +64,9 @@ Static timing analysis of the synthesized netlist, ideal wires and ideal clocks 
 **Inputs**
 
 - Post-syn netlist `.v`
-- Library of cells `.lib` (Liberty, RVT; with `VT_SWAP=1` also LVT and SLVT)
-- Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with I/O delays from `IO_DELAY_PCT` (default zero) or a project `SDC` file, hold false-pathed on I/O
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `IO_DELAY_PCT`, `SDC`, `VT_SWAP` (optional)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT; with `VT_SWAP=1` also LVT and SLVT)
+- Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with I/O delays from `IO_DELAY_PCT` (default zero) or a project `SDC` file, hold false-pathed on I/O, optional setup margin (`SETUP_MARGIN_PCT`) and late derate (`DERATE`)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `IO_DELAY_PCT`, `SDC`, `VT_SWAP`, `CORNER`, `SETUP_MARGIN_PCT`, `DERATE` (optional)
 
 **Outputs**
 
@@ -79,10 +79,10 @@ VCD-based dynamic power analysis of the synthesized netlist (`make post-syn-dpa`
 **Inputs**
 
 - Post-syn netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT; with `VT_SWAP=1` also LVT and SLVT)
 - Post-syn switching activity `.vcd` (annotated onto scope `<TB>/dut`)
 - Constraints, generated inline (as in POST-SYN-STA)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `IO_DELAY_PCT`, `SDC` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `KEEP_HIERARCHY`, `KEEP_MODULES`, `BLACKBOX_MODULES`, `IO_DELAY_PCT`, `SDC`, `VT_SWAP`, `CORNER` (optional)
 
 **Outputs**
 
@@ -95,14 +95,14 @@ Place-and-route from the synthesized netlist to the final layout (`make pnr`), s
 **Inputs**
 
 - Post-syn netlist `.v` (flat)
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT)
 - Technology dimensions `.lef` (tech LEF + standard-cell LEF)
 - Standard-cell layout `.gds` (for the final merge)
 - Constraints, generated inline from `CLK_PERIOD_NS` (same scheme as the STA steps)
 - ASAP7 platform physical setup (routing tracks, PDN grid strategy, wire RC, RC extraction rules)
 - Hierarchical mode: hardened-block abstracts `.lef`/`.lib`/`.gds` (`MACRO_DIRS`) + project-owned macro-placement TCL (`FLOORPLAN`)
 - Project-owned pin-constraint TCL (`PINS`) and constraint additions such as per-port I/O budgets (`SDC`)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `CORE_UTIL`, `ASPECT_RATIO`, `CORE_MARGIN`, `PLACE_DENSITY`, `CELL_PAD`, `INIT_DENSITY_PENALTY`, `MAX_ROUTE_LAYER`, `MIN_CLK_LAYER`, `CLK_UNCERTAINTY_PS`, `IO_DELAY_PCT`, `SDC`, `PNR_STEP`, `PNR_THREADS`, `PNR_REPAIR`, `ALLOW_CONGESTION`, `DROUTE_END_ITER`, `MACRO_DIRS`, `FLOORPLAN`, `MACRO_CHANNEL`, `MACRO_CHANNEL_Y`, `PDN`, `PINS`, `PIN_LAYERS_HOR`, `PIN_LAYERS_VER`, `PIN_ARGS` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `CORE_UTIL`, `ASPECT_RATIO`, `CORE_MARGIN`, `PLACE_DENSITY`, `CELL_PAD`, `INIT_DENSITY_PENALTY`, `MAX_ROUTE_LAYER`, `MIN_CLK_LAYER`, `CLK_UNCERTAINTY_PS`, `CORNER`, `IO_DELAY_PCT`, `SDC`, `PNR_STEP`, `PNR_THREADS`, `PNR_REPAIR`, `ALLOW_CONGESTION`, `DROUTE_END_ITER`, `MACRO_DIRS`, `FLOORPLAN`, `MACRO_CHANNEL`, `MACRO_CHANNEL_Y`, `PDN`, `PINS`, `PIN_LAYERS_HOR`, `PIN_LAYERS_VER`, `PIN_ARGS` (optional)
 
 **Outputs**
 
@@ -138,11 +138,11 @@ Parasitics-accurate static timing analysis of the routed design (`make post-pnr-
 **Inputs**
 
 - Post-pnr netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT)
 - Post-pnr parasitics `.spef`
 - Constraints, generated inline (as in POST-SYN-STA), clocks propagated
 - Hardened-block timing models `.lib` (`MACRO_DIRS`, hierarchical results)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `MACRO_DIRS`, `IO_DELAY_PCT`, `SDC` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `MACRO_DIRS`, `IO_DELAY_PCT`, `SDC`, `CORNER` (optional)
 
 **Outputs**
 
@@ -155,12 +155,12 @@ Parasitics-accurate dynamic power analysis of the routed design (`make post-pnr-
 **Inputs**
 
 - Post-pnr netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT)
 - Post-pnr parasitics `.spef`
 - Post-pnr switching activity `.vcd` (from POST-PNR-SIM)
 - Constraints, generated inline, clocks propagated
 - Hardened-block routed netlists `.v` + parasitics `.spef` (`MACRO_DIRS`, hierarchical results: the blocks are linked in full and annotated per instance, so macro internals are analyzed with real power tables)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `MACRO_DIRS`, `IO_DELAY_PCT`, `SDC` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `MACRO_DIRS`, `IO_DELAY_PCT`, `SDC`, `CORNER` (optional)
 
 **Outputs**
 

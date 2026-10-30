@@ -7,11 +7,11 @@ The definitive timing measurement: the routed netlist with extracted parasitics 
 **Inputs**
 
 - Post-pnr netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT)
 - Post-pnr parasitics `.spef`
 - Constraints, generated inline (as in POST-SYN-STA), clocks propagated
 - Hardened-block timing models `.lib` (`MACRO_DIRS`, hierarchical results)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `MACRO_DIRS` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `MACRO_DIRS`, `CORNER` (optional)
 
 **Outputs**
 
@@ -34,11 +34,18 @@ Why this step exists at all when stage 5 already reported timing: separation of 
 set REPORT_DIR $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/report
 file mkdir $REPORT_DIR
 
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
+
+set CORNER $env(SEL_CORNER)
+read_liberty [lib_file asap7sc7p5t_SEQ_RVT_${CORNER}_nldm_220123]
+read_liberty [lib_file asap7sc7p5t_SIMPLE_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_INVBUF_RVT_${CORNER}_nldm_220122]
+read_liberty [lib_file asap7sc7p5t_AO_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_OA_RVT_${CORNER}_nldm_211120]
 
 if {$env(SEL_MACRO_DIRS) ne "none"} {
     foreach dir $env(SEL_MACRO_DIRS) {
@@ -121,7 +128,7 @@ The same four reports as post-syn STA — by design: reading the two runs' `crit
 
 - **Hold reporting**: `-path_delay min` (or `min_max`) turns on hold reports — worth running once per design generation to confirm routing's hold repair converged with margin.
 - **SI-aware timing**: coupling-annotated SPEF plus a crosstalk-capable timer upgrades to signal-integrity analysis (aggressor-induced delay deltas) — the main accuracy step this flow doesn't take.
-- **Multi-corner**: the same script re-pointed at SS/FF liberty (plus per-corner extraction) is the signoff pattern; single-corner TT here.
+- **Multi-corner**: the same script re-pointed at SS/FF liberty (plus per-corner extraction) is the signoff pattern; one corner per run here (`CORNER`, TT by default).
 - **Derating/uncertainty**: adding OCV derates or a nonzero uncertainty models variation; the flow keeps analysis and implementation targets identical instead.
 
 ## Knobs
@@ -131,6 +138,7 @@ The same four reports as post-syn STA — by design: reading the two runs' `crit
 | `CLK_PERIOD_NS` | make  | 1.0     | Analysis period — use the implementation's for truth |
 | `NETLIST_DIR`   | make  | —       | Which P&R run to analyze                             |
 | `MACRO_DIRS`    | make  | none    | Blocks' timing models (hierarchical results)         |
+| `CORNER`        | make  | TT      | Liberty corner of the analysis (TT, FF or SS)        |
 
 ## Notes and caveats
 

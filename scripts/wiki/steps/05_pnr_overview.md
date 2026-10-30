@@ -7,13 +7,13 @@ Place-and-route is the largest step of the flow, so it is built differently from
 **Inputs**
 
 - Post-syn netlist `.v` (flat)
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT)
 - Technology dimensions `.lef` (tech LEF + standard-cell LEF)
 - Standard-cell layout `.gds` (for the final merge)
 - Constraints, generated inline from `CLK_PERIOD_NS` (same scheme as the STA steps)
 - ASAP7 platform physical setup (routing tracks, PDN grid strategy, wire RC, RC extraction rules)
 - Hierarchical mode: hardened-block abstracts `.lef`/`.lib`/`.gds` (`MACRO_DIRS`) + project-owned macro-placement TCL (`FLOORPLAN`)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `CORE_UTIL`, `ASPECT_RATIO`, `CORE_MARGIN`, `PLACE_DENSITY`, `CLK_UNCERTAINTY_PS`, `PNR_STEP`, `PNR_THREADS`, `MACRO_DIRS`, `FLOORPLAN`, `PDN` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `CORE_UTIL`, `ASPECT_RATIO`, `CORE_MARGIN`, `PLACE_DENSITY`, `CLK_UNCERTAINTY_PS`, `CORNER`, `PNR_STEP`, `PNR_THREADS`, `MACRO_DIRS`, `FLOORPLAN`, `PDN` (optional)
 
 **Outputs**
 
@@ -84,11 +84,18 @@ set REPORT_DIR $::env(REPO_HOME)/projects/$::env(SEL_PROJECT)/imp/$::env(SEL_OUT
 
 source $::env(ASAP7_HOME)/liberty_suppressions.tcl
 
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
+
+set CORNER $::env(SEL_CORNER)
+read_liberty [lib_file asap7sc7p5t_SEQ_RVT_${CORNER}_nldm_220123]
+read_liberty [lib_file asap7sc7p5t_SIMPLE_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_INVBUF_RVT_${CORNER}_nldm_220122]
+read_liberty [lib_file asap7sc7p5t_AO_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_OA_RVT_${CORNER}_nldm_211120]
 
 if {$::env(SEL_MACRO_DIRS) ne "none"} {
     foreach dir $::env(SEL_MACRO_DIRS) {
@@ -227,6 +234,7 @@ Every stage ends with the same snapshot: worst path with slews/caps, WNS, TNS, a
 | `PNR_REPAIR`  | make  | 1        | `0` = routability-only run: stages 2–4 skip design/timing repair     |
 | `PDN`         | make  | auto     | PDN strategy file (see selection logic above)                        |
 | `MACRO_DIRS`  | make  | none     | Hierarchical mode master switch (affects every stage's context)      |
+| `CORNER`      | make  | TT       | Liberty corner of every stage (TT, FF or SS), RVT only               |
 
 ## Notes and caveats
 

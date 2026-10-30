@@ -13,7 +13,6 @@ source $env(REPO_HOME)/scripts/syn/compile.tcl
 # -----------------------------------------------------------------------------
 set imp_dir "$env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp"
 
-# Resolve a blackboxed module's netlist: prefer imp/<mod>_vt_syn/ when VT_SWAP is set, then imp/<mod>_syn/, then imp/<mod>/
 proc bb_netlist {imp_dir mod} {
     set dirs [list ${mod}_syn $mod]
     if {$::env(SEL_VT_SWAP) ne "0"} {
@@ -104,7 +103,7 @@ yosys "opt"
 # -----------------------------------------------------------------------------
 # Technology mapping Flip-Flops
 # -----------------------------------------------------------------------------
-yosys "dfflibmap -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib"
+yosys "dfflibmap -liberty [lindex $rvt_libs 0]"
 yosys "opt"
 
 # -----------------------------------------------------------------------------
@@ -114,25 +113,38 @@ yosys "techmap -map $env(ASAP7_HOME)/yoSys/cells_latch_R.v"
 yosys "opt"
 
 # -----------------------------------------------------------------------------
-# Technology mapping Combinational Logic (delay target from CLK_PERIOD_NS)
+# Technology mapping Combinational Logic
 # -----------------------------------------------------------------------------
 set CLK_PERIOD_PS [expr {int($env(SEL_CLK_PERIOD_NS) * 1000)}]
+set ABC_DELAY_PS  [expr {int($CLK_PERIOD_PS * (100 - $env(SEL_SETUP_MARGIN_PCT)) / 100.0 / $env(SEL_DERATE))}]
+set out_dir       "$env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/output"
 
 set fh [open $env(REPO_HOME)/scripts/syn/abc.tcl r]
 set abc_script [read $fh]
 close $fh
-set abc_script [string map [list "\{D\}" "-D $CLK_PERIOD_PS"] $abc_script]
-set abc_file "$env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/output/abc.script"
+set abc_script [string map [list "\{D\}" "-D $ABC_DELAY_PS"] $abc_script]
+set abc_file "$out_dir/abc.script"
 set fh [open $abc_file w]
 puts -nonewline $fh $abc_script
 close $fh
 
-yosys "abc \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib \
-    -script  $abc_file"
+set abc_libs ""
+set unpacked {}
+foreach lib [lrange $rvt_libs 1 end] {
+    if {[file extension $lib] eq ".gz"} {
+        set plain $out_dir/[file rootname [file tail $lib]]
+        exec gzip -dc $lib > $plain
+        lappend unpacked $plain
+        set lib $plain
+    }
+    append abc_libs " -liberty $lib"
+}
+
+yosys "abc$abc_libs -script $abc_file"
+
+foreach f $unpacked {
+    file delete $f
+}
 
 yosys "opt"
 yosys "clean"
@@ -149,16 +161,11 @@ if {$env(SEL_LINK_BLACKBOXES) ne "0"} {
 # -----------------------------------------------------------------------------
 # Generate hierarchical area report
 # -----------------------------------------------------------------------------
-set vt_stat ""
-foreach lib $vt_libs {
-    append vt_stat " -liberty $lib"
+set stat_libs ""
+foreach lib [concat $rvt_libs $vt_libs] {
+    append stat_libs " -liberty $lib"
 }
-yosys "tee -o $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/report/area.rpt stat -hierarchy \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib \
-    -liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib$vt_stat"
+yosys "tee -o $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_OUT_DIR)/report/area.rpt stat -hierarchy$stat_libs"
 
 # -----------------------------------------------------------------------------
 # Flatten full design, optimize and clean for netlist output

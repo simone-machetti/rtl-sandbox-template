@@ -30,7 +30,7 @@ A `.lib` file is a text database with one `cell` entry per gate. For each input-
 
 Three axes multiply the number of `.lib` files:
 
-- **Corner (PVT)**: process (slow/typical/fast transistors), voltage, temperature. A library is characterized per corner — e.g. `TT` 0.70 V (typical), `SS` 0.63 V 100 °C (worst-case slow, setup signoff), `FF` 0.77 V 0 °C (fast, hold signoff). This flow runs single-corner **TT** throughout: architectural comparison, not signoff.
+- **Corner (PVT)**: process (slow/typical/fast transistors), voltage, temperature. A library is characterized per corner — e.g. `TT` 0.70 V 25 °C (typical), `SS` 0.63 V 100 °C (worst-case slow, setup signoff), `FF` 0.77 V 0 °C (fast, hold signoff). Every step reads one corner, chosen with `CORNER` (**TT** by default; ASAP7 ships all three in RVT, LVT and SLVT): architectural comparison runs at TT, and another corner can stand in for a target flow whose cells are faster or slower than ASAP7's.
 - **VT flavor**: the same logical cell is offered with different threshold-voltage implants — in ASAP7: `R` (regular VT), `L` (low VT: faster, leakier), `SL` (super-low VT). Mixed-VT optimization is a classic leakage-vs-speed lever; this flow maps to **RVT**, and the optional synthesis step `VT_SWAP=1` swaps the cells of failing paths to LVT or SLVT ([01_syn.md](../steps/01_syn.md)); place-and-route loads RVT only.
 - **Functional group**: ASAP7 splits the library into five files — `SIMPLE` (basic gates), `INVBUF` (inverters/buffers), `AO`/`OA` (and-or / or-and complex gates), `SEQ` (flip-flops, latches, ICGs) — which is why every script reads five `read_liberty` lines.
 
@@ -84,14 +84,21 @@ Technology enters the flow in three places, always through the same file lists.
 Liberty — identically in synthesis (`scripts/syn/compile.tcl`, as `-lib` for cell recognition), in every OpenSTA step, and in every P&R stage (`scripts/pnr/init_tech.tcl`):
 
 ```tcl
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
-read_liberty $::env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
+
+set CORNER $::env(SEL_CORNER)
+read_liberty [lib_file asap7sc7p5t_SEQ_RVT_${CORNER}_nldm_220123]
+read_liberty [lib_file asap7sc7p5t_SIMPLE_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_INVBUF_RVT_${CORNER}_nldm_220122]
+read_liberty [lib_file asap7sc7p5t_AO_RVT_${CORNER}_nldm_211120]
+read_liberty [lib_file asap7sc7p5t_OA_RVT_${CORNER}_nldm_211120]
 ```
 
-The file names encode the axes described above: `asap7sc7p5t` (7.5-track library) + group + `RVT` + `TT` + `nldm` + characterization date. The suppression file sourced before them in P&R (`liberty_suppressions.tcl`) silences one known benign warning in the SIMPLE library.
+The file names encode the axes described above: `asap7sc7p5t` (7.5-track library) + group + `RVT` + corner (`TT`, `FF`, `SS`) + `nldm` + characterization date. The kit ships the flip-flop group uncompressed and the other four groups gzipped (the RVT TT ones in both forms), so `lib_file` takes the plain file when there is one. OpenSTA, OpenROAD and Yosys read the gzipped files directly; ABC does not, so synthesis unpacks them into the run folder for the mapping and deletes them afterwards ([01_syn.md](../steps/01_syn.md)). The suppression file sourced before them in P&R (`liberty_suppressions.tcl`) silences one known benign warning in the SIMPLE library.
 
 LEF — in `init_tech.tcl`, consumed by stage 1:
 
@@ -114,7 +121,7 @@ set_wire_rc -clock  -resistance 5.13971E-02 -capacitance 1.44549E-01
 
 ## Design space
 
-- **Corners**: adding `SS`/`FF` liberty sets and analyzing setup at SS / hold at FF is the step from "architectural comparison" to "signoff-style" timing. OpenSTA and OpenROAD support multi-corner analysis; the flow's single-TT choice trades that rigor for speed and simplicity.
+- **Corners**: `CORNER` moves the whole flow to one other corner; analyzing setup at SS and hold at FF in the same run is the step from "architectural comparison" to "signoff-style" timing. OpenSTA and OpenROAD support multi-corner analysis; the flow's single-corner choice trades that rigor for speed and simplicity.
 - **VT mixing**: allowing `L`/`SL` cells during optimization (additional liberty files + removing them from the dont-use list) buys speed on critical paths at a leakage cost — one of the most effective knobs in real flows.
 - **NLDM vs CCS**: switching the file set to `lib/CCS/` increases model fidelity (waveform effects, better slew handling) at higher runtime; relative comparisons rarely justify it.
 - **Track library height**: ASAP7 also ships 6-track and 9-track variants conceptually (7.5T here); the height choice is a density-vs-drive tradeoff fixed at library selection time.
@@ -122,13 +129,13 @@ set_wire_rc -clock  -resistance 5.13971E-02 -capacitance 1.44549E-01
 
 ## Knobs
 
-| Knob               | Where             | Default                  | Effect / tradeoff                                                        |
-| ------------------ | ----------------- | ------------------------ | ------------------------------------------------------------------------ |
-| `ASAP7_HOME`       | make              | `$PDK_HOME/vendor/asap7` | The cell library: liberty, cell LEF, GDS, simulation models              |
-| `BEOL`             | make              | asap7                    | The metal stack: `$PDK_HOME/beol/<name>`, or the stock stack for `asap7` |
-| Liberty corner set | script file lists | RVT TT                   | Analysis realism vs runtime; SS/FF needed for signoff-style              |
-| VT flavors loaded  | `VT_SWAP`         | RVT only                 | `1` = RVT + LVT + SLVT in synthesis and post-syn STA: speed vs leakage   |
-| NLDM vs CCS        | script file lists | NLDM                     | Model fidelity vs runtime                                                |
+| Knob               | Where             | Default                  | Effect / tradeoff                                                                     |
+| ------------------ | ----------------- | ------------------------ | ------------------------------------------------------------------------------------- |
+| `ASAP7_HOME`       | make              | `$PDK_HOME/vendor/asap7` | The cell library: liberty, cell LEF, GDS, simulation models                           |
+| `BEOL`             | make              | asap7                    | The metal stack: `$PDK_HOME/beol/<name>`, or the stock stack for `asap7`              |
+| `CORNER`           | make              | TT                       | Liberty corner of every step (TT, FF or SS); one corner per run                       |
+| VT flavors loaded  | `VT_SWAP`         | RVT only                 | `1` = RVT + LVT + SLVT in synthesis and post-syn sim, STA and power: speed vs leakage |
+| NLDM vs CCS        | script file lists | NLDM                     | Model fidelity vs runtime                                                             |
 
 ## Notes and caveats
 

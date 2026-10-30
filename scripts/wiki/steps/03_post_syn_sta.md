@@ -7,9 +7,9 @@ The first timing measurement of the netlist: exhaustive, vectorless, and — at 
 **Inputs**
 
 - Post-syn netlist `.v`
-- Library of cells `.lib` (Liberty, RVT; with `VT_SWAP=1` also LVT and SLVT)
-- Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with zero I/O delays, hold false-pathed on I/O
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `VT_SWAP`, `IO_DELAY_PCT`, `SDC` (optional)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT; with `VT_SWAP=1` also LVT and SLVT)
+- Constraints, generated inline from `CLK_PERIOD_NS`: clock on `clk_i` (if present) + virtual clock with zero I/O delays, hold false-pathed on I/O, optional setup margin and derate
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR` (required); `VT_SWAP`, `CORNER`, `SETUP_MARGIN_PCT`, `DERATE`, `IO_DELAY_PCT`, `SDC` (optional)
 
 **Outputs**
 
@@ -38,31 +38,30 @@ file mkdir $REPORT_DIR
 Report destination per the run-directory convention.
 
 ```tcl
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
-read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
+proc lib_file {name} {
+    set f $::env(ASAP7_HOME)/lib/NLDM/$name.lib
+    if {[file exists $f]} { return $f }
+    return $f.gz
+}
+
+set CORNER $env(SEL_CORNER)
+set vts {RVT}
+if {$env(SEL_VT_SWAP) ne "0"} {
+    lappend vts LVT SLVT
+}
+foreach vt $vts {
+    read_liberty [lib_file asap7sc7p5t_SEQ_${vt}_${CORNER}_nldm_220123]
+    read_liberty [lib_file asap7sc7p5t_SIMPLE_${vt}_${CORNER}_nldm_211120]
+    read_liberty [lib_file asap7sc7p5t_INVBUF_${vt}_${CORNER}_nldm_220122]
+    read_liberty [lib_file asap7sc7p5t_AO_${vt}_${CORNER}_nldm_211120]
+    read_liberty [lib_file asap7sc7p5t_OA_${vt}_${CORNER}_nldm_211120]
+}
 
 read_verilog $env(REPO_HOME)/projects/$env(SEL_PROJECT)/imp/$env(SEL_NETLIST_DIR)/output/netlist.v
 link_design  $env(SEL_TOP_LEVEL)
 ```
 
-The standard loading sequence: timing models, then the netlist, then linking (every instance bound to a liberty cell; unresolved names error here).
-
-```tcl
-if {$env(SEL_VT_SWAP) ne "0"} {
-    foreach vt {LVT SLVT} {
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SEQ_${vt}_TT_nldm_220123.lib
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_SIMPLE_${vt}_TT_nldm_211120.lib.gz
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_INVBUF_${vt}_TT_nldm_220122.lib.gz
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_AO_${vt}_TT_nldm_211120.lib.gz
-        read_liberty $env(ASAP7_HOME)/lib/NLDM/asap7sc7p5t_OA_${vt}_TT_nldm_211120.lib.gz
-    }
-}
-```
-
-A netlist from a `VT_SWAP=1` synthesis ([01_syn.md](01_syn.md)) contains LVT and SLVT cells, so the analysis must run with `VT_SWAP=1` too; without it, linking stops at the first unknown cell.
+The standard loading sequence: timing models of the selected corner (`CORNER`, TT by default; `lib_file` takes the plain or the gzipped file, [technology.md](../concepts/technology.md)), then the netlist, then linking (every instance bound to a liberty cell; unresolved names error here). A netlist from a `VT_SWAP=1` synthesis ([01_syn.md](01_syn.md)) contains LVT and SLVT cells, so the analysis must run with `VT_SWAP=1` too; without it, linking stops at the first unknown cell.
 
 ```tcl
 set CLK_PERIOD_PS [expr {$env(SEL_CLK_PERIOD_NS) * 1000}]
@@ -88,6 +87,14 @@ if {[llength [all_outputs]] > 0} {
     set_false_path -hold -to [all_outputs]
 }
 
+set SETUP_MARGIN_PS [expr {$CLK_PERIOD_PS * $env(SEL_SETUP_MARGIN_PCT) / 100.0}]
+if {$SETUP_MARGIN_PS > 0} {
+    set_clock_uncertainty -setup $SETUP_MARGIN_PS [all_clocks]
+}
+if {$env(SEL_DERATE) != 1.0} {
+    set_timing_derate -late $env(SEL_DERATE)
+}
+
 if {$env(SEL_SDC) ne "none"} {
     set sdc_file $env(SEL_SDC)
     if {[file pathtype $sdc_file] ne "absolute"} {
@@ -99,7 +106,7 @@ if {$env(SEL_SDC) ne "none"} {
 
 The shared constraint scheme, explained line-by-line in [02_constraints.md](../concepts/constraints.md). Its effect here: register→register paths are constrained by `clk_i`, and all boundary paths (in→reg, reg→out, in→out) by the virtual clock — so the reports cover every path class, and a purely combinational netlist (no `clk_i` port) still produces meaningful in→out timing instead of an error.
 
-`IO_DELAY_PCT` (zero by default) sets the two boundary delays as a share of the period, and `SDC` sources a project file of extra constraints on top of the generated ones, exactly as place-and-route does, so the analysis sees the constraints the layout was built with.
+`IO_DELAY_PCT` (zero by default) sets the two boundary delays as a share of the period; `SETUP_MARGIN_PCT` (zero by default) subtracts a share of the period from every setup check as clock uncertainty, and `DERATE` (1.0 by default) stretches every late delay, the same budget the synthesis swap optimized against ([constraints](../concepts/constraints.md)); `SDC` sources a project file of extra constraints on top of the generated ones, exactly as place-and-route does, so the analysis sees the constraints the layout was built with.
 
 ```tcl
 report_checks -unconstrained > $REPORT_DIR/unconstrained.rpt
@@ -119,16 +126,19 @@ Four reports: a sanity report of anything *still* unconstrained (should be only 
 
 - **Parasitics realism**: pre-layout STA can be made less optimistic with wire-load models (statistical net-length estimates — largely abandoned at advanced nodes) or SPEF from a trial placement; this flow simply defers realism to post-route STA.
 - **Hold analysis** (`-path_delay min`) is omitted here deliberately: with ideal clocks hold is meaningless (no skew); it becomes real — and analyzed — after CTS.
-- **Derating/OCV**: production STA multiplies delays by early/late derates (or uses statistical POCV) to model on-chip variation; single-corner TT without derates is the exploration-grade choice.
+- **Derating/OCV**: production STA multiplies delays by early/late derates (or uses statistical POCV) to model on-chip variation; the flow offers one corner per run and a flat late derate (`DERATE`), the exploration-grade choice.
 - **Report shaping**: `-group_path_count`, `-fields`, per-endpoint reports (`report_checks -to`), and bottleneck analysis (`report_check_types`) are the standard widening moves when one worst path is not enough information.
 
 ## Knobs
 
-| Knob            | Where | Default | Effect / tradeoff                                                   |
-| --------------- | ----- | ------- | ------------------------------------------------------------------- |
-| `CLK_PERIOD_NS` | make  | 1.0     | The reference period; WNS is measured against it                    |
-| `NETLIST_DIR`   | make  | —       | Which netlist to analyze                                            |
-| `VT_SWAP`       | make  | 0       | `1` = also load LVT and SLVT, for netlists of a swap-step synthesis |
+| Knob               | Where | Default | Effect / tradeoff                                                   |
+| ------------------ | ----- | ------- | ------------------------------------------------------------------- |
+| `CLK_PERIOD_NS`    | make  | 1.0     | The reference period; WNS is measured against it                    |
+| `NETLIST_DIR`      | make  | —       | Which netlist to analyze                                            |
+| `VT_SWAP`          | make  | 0       | `1` = also load LVT and SLVT, for netlists of a swap-step synthesis |
+| `CORNER`           | make  | TT      | Liberty corner of the analysis (TT, FF or SS)                       |
+| `SETUP_MARGIN_PCT` | make  | 0       | Setup clock uncertainty, share of the period                        |
+| `DERATE`           | make  | 1.0     | Late derate on cell and net delays                                  |
 
 ## Notes and caveats
 

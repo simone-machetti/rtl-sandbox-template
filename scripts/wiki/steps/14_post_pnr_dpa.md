@@ -7,12 +7,12 @@ The most accurate power number the flow produces: measured switching activity on
 **Inputs**
 
 - Post-pnr netlist `.v`
-- Library of cells `.lib` (Liberty)
+- Library of cells `.lib` (Liberty of the `CORNER`, RVT)
 - Post-pnr parasitics `.spef`
 - Post-pnr switching activity `.vcd` (from POST-PNR-SIM)
 - Constraints, generated inline, clocks propagated
 - Hardened-block routed netlists `.v` + parasitics `.spef` (`MACRO_DIRS`, hierarchical results: the blocks are linked in full and annotated per instance, so macro internals are analyzed with real power tables)
-- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `MACRO_DIRS` (optional)
+- Make parameters: `PROJECT`, `TOP_LEVEL`, `CLK_PERIOD_NS`, `OUT_DIR`, `NETLIST_DIR`, `VCD_DIR` (required); `TB`, `MACRO_DIRS`, `CORNER` (optional)
 
 **Outputs**
 
@@ -116,6 +116,7 @@ The summary — true totals, macros included — and, when macros exist, the per
 | `NETLIST_DIR` / `VCD_DIR` | make  | —                | The P&R run and its GLS activity                   |
 | `MACRO_DIRS`              | make  | none             | Enables full-view analysis + `power_macros.rpt`    |
 | `TB`                      | make  | `tb_<top_level>` | Must match the VCD-producing bench                 |
+| `CORNER`                  | make  | TT               | Liberty corner of the power tables (TT, FF or SS)  |
 
 ## Notes and caveats
 

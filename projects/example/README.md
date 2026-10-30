@@ -98,17 +98,17 @@ Reference results of this sequence (wall-clock times on one desktop machine, all
 | Step                     | Time | Result                                                                                                                                                                                           |
 | ------------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `sim` × 3                | 5 s  | All three benches `PASSED` (2000 random + corner vectors each).                                                                                                                                  |
-| `syn`                    | 3 s  | 3421 cells, 322.03 µm².                                                                                                                                                                          |
-| `syn` `KEEP_HIERARCHY=1` | 8 s  | Per-module `report/area.rpt`: `mac_n` 272.56 µm² (4 × `mul_n` 62.56, `add_tree_n` 22.31 = 3 × `add_n` 7.44), `reg_n` 15.86 / 15.86 / 9.42 / 0.87; top 314.58 µm² with every boundary kept.       |
-| `post-syn-sim` `VCD=1`   | 14 s | `PASSED`; 11119 pins annotated, 0 unannotated.                                                                                                                                                   |
-| `post-syn-sta`           | 1 s  | WNS 0, worst slack +415.8 ps (ideal wires).                                                                                                                                                      |
-| `post-syn-dpa`           | 2 s  | 0.499 mW total (45.8 % internal, 54.1 % switching).                                                                                                                                              |
-| `pnr`                    | 78 s | 329 µm² design area at 41 % utilization; WNS 0, worst slack +540.4 ps; `route_drc.rpt` empty; 5.0 ps setup clock skew; `design.gds` 3.6 MB; operands on the left/top edges, result on the right. |
-| `post-pnr-sim` `VCD=1`   | 7 s  | `PASSED` on the routed netlist; 11246 pins annotated, 0 unannotated.                                                                                                                             |
-| `post-pnr-sta`           | 2 s  | WNS 0, worst slack +540.4 ps with SPEF parasitics and propagated clocks.                                                                                                                         |
-| `post-pnr-dpa`           | 2 s  | 0.610 mW total, of which the clock tree 8.7 %.                                                                                                                                                   |
+| `syn`                    | 3 s  | 4406 cells, 389.85 µm².                                                                                                                                                                          |
+| `syn` `KEEP_HIERARCHY=1` | 8 s  | Per-module `report/area.rpt`: `mac_n` 280.50 µm² (4 × `mul_n` 62.90, `add_tree_n` 28.91 = 3 × `add_n` 9.64), `reg_n` 15.86 / 15.86 / 9.42 / 0.87; top 322.52 µm² with every boundary kept.       |
+| `post-syn-sim` `VCD=1`   | 14 s | `PASSED`; 14589 pins annotated, 0 unannotated.                                                                                                                                                   |
+| `post-syn-sta`           | 1 s  | WNS 0, worst slack +372.3 ps (ideal wires).                                                                                                                                                      |
+| `post-syn-dpa`           | 2 s  | 0.549 mW total (41.7 % internal, 58.2 % switching).                                                                                                                                              |
+| `pnr`                    | 78 s | 397 µm² design area at 41 % utilization; WNS 0, worst slack +388.5 ps; `route_drc.rpt` empty; 5.9 ps setup clock skew; `design.gds` 4.2 MB; operands on the left/top edges, result on the right. |
+| `post-pnr-sim` `VCD=1`   | 7 s  | `PASSED` on the routed netlist; 14712 pins annotated, 0 unannotated.                                                                                                                             |
+| `post-pnr-sta`           | 2 s  | WNS 0, worst slack +388.5 ps with SPEF parasitics and propagated clocks.                                                                                                                         |
+| `post-pnr-dpa`           | 2 s  | 0.676 mW total, of which the clock tree 8.2 %.                                                                                                                                                   |
 
-The same sequence at `CLK_PERIOD_NS=1.0` still closes after place-and-route (repair leaves +70 ps), but the post-synthesis netlist alone violates by about 110 ps, which is why the reference period is 1.5 ns.
+The same sequence at `CLK_PERIOD_NS=1.0` still closes after place-and-route (repair leaves +30 ps), but the post-synthesis netlist alone violates by about 130 ps, which is why the reference period is 1.5 ns.
 
 ### Hierarchical: `mac_n` as a hard macro
 
@@ -137,13 +137,13 @@ Reference results of this sequence:
 
 | Step                               | Time | Result                                                                                                                                                                                            |
 | ---------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `syn` `mac_n`                      | 3 s  | 285.24 µm² standalone.                                                                                                                                                                            |
-| `pnr` `mac_n` `MAX_ROUTE_LAYER=M5` | 46 s | 285 µm² at 40 % utilization; WNS 0, worst slack +718.9 ps; `route_drc.rpt` empty; pins on the planned edges; emits `abstract.lef` (obstructions on M1–M5 only), `timing_model.lib`, `design.gds`. |
+| `syn` `mac_n`                      | 3 s  | 364.85 µm² standalone.                                                                                                                                                                            |
+| `pnr` `mac_n` `MAX_ROUTE_LAYER=M5` | 46 s | 365 µm² at 40 % utilization; WNS 0, worst slack +593.7 ps; `route_drc.rpt` empty; pins on the planned edges; emits `abstract.lef` (obstructions on M1–M5 only), `timing_model.lib`, `design.gds`. |
 | `syn` parent, `mac_n` stubbed      | 2 s  | 42.14 µm² — the registers and glue only; `mac_n` stays an empty module in the netlist.                                                                                                            |
-| `pnr` parent with the macro        | 72 s | 993 µm² design area (macro footprint included) at 41 % utilization; WNS 0, worst slack +556.2 ps; `route_drc.rpt` empty.                                                                          |
-| `post-pnr-sim` `VCD=1`             | 8 s  | `PASSED` with the block's routed netlist compiled in full; 10857 pins annotated, 0 unannotated.                                                                                                   |
-| `post-pnr-sta`                     | 2 s  | WNS 0, worst slack +556.2 ps through the macro's timing model.                                                                                                                                    |
-| `post-pnr-dpa`                     | 2 s  | 0.694 mW total in full-view mode; `power_macros.rpt` attributes 0.425 mW to `mac_n_i`.                                                                                                            |
+| `pnr` parent with the macro        | 72 s | 1220 µm² design area (macro footprint included) at 40 % utilization; WNS 0, worst slack +410.8 ps; `route_drc.rpt` empty.                                                                         |
+| `post-pnr-sim` `VCD=1`             | 8 s  | `PASSED` with the block's routed netlist compiled in full; 15379 pins annotated, 0 unannotated.                                                                                                   |
+| `post-pnr-sta`                     | 2 s  | WNS 0, worst slack +410.8 ps through the macro's timing model.                                                                                                                                    |
+| `post-pnr-dpa`                     | 2 s  | 0.770 mW total in full-view mode; `power_macros.rpt` attributes 0.500 mW to `mac_n_i`.                                                                                                            |
 
 ### The same flow on the `smic-n3` metal stack
 
@@ -170,33 +170,33 @@ make post-pnr-dpa PROJECT=example TOP_LEVEL=top_example CLK_PERIOD_NS=1.5 OUT_DI
 
 Reference results, next to the stock stack's from the two tables above:
 
-| Step                  | Quantity                       | ASAP7 stack          | `smic-n3` stack      |
-| --------------------- | ------------------------------ | -------------------- | -------------------- |
-| `pnr` flat            | Time                           | 78 s                 | 107 s                |
-|                       | Design area                    | 329 µm²              | 329 µm²              |
-|                       | Worst slack                    | +540.4 ps            | +517.9 ps            |
-|                       | `route_drc.rpt`                | empty                | empty                |
-|                       | Wire length, vias              | 7518 µm, 26397       | 7662 µm, 25763       |
-|                       | Wire length on M2 / M3 / above | 3157 / 3373 / 986 µm | 3334 / 3329 / 996 µm |
-|                       | Setup clock skew               | 5.0 ps               | 7.4 ps               |
-| `post-pnr-sim` flat   | Result                         | `PASSED`             | `PASSED`             |
-| `post-pnr-dpa` flat   | Total power, clock share       | 0.610 mW, 8.7 %      | 0.616 mW, 9.2 %      |
-| `pnr` `mac_n`         | Time                           | 46 s                 | 69 s                 |
-|                       | Design area                    | 285 µm²              | 285 µm²              |
-|                       | Worst slack                    | +718.9 ps            | +681.5 ps            |
-|                       | `route_drc.rpt`                | empty                | empty                |
-|                       | Wire length                    | 7201 µm              | 7503 µm              |
-|                       | Abstract obstructions          | M1–M5                | M1–M4                |
-|                       | Power pins, top-edge pins      | M5, M5               | M4, M3               |
-| `pnr` parent          | Time                           | 72 s                 | 133 s                |
-|                       | Design area                    | 993 µm²              | 993 µm²              |
-|                       | Worst slack                    | +556.2 ps            | +517.9 ps            |
-|                       | `route_drc.rpt`                | empty                | empty                |
-|                       | Wire length                    | 1596 µm              | 1619 µm              |
-| `post-pnr-sim` parent | Result                         | `PASSED`             | `PASSED`             |
-| `post-pnr-dpa` parent | Total power, `mac_n_i`         | 0.694, 0.425 mW      | 0.697, 0.428 mW      |
+| Step                  | Quantity                       | ASAP7 stack           | `smic-n3` stack       |
+| --------------------- | ------------------------------ | --------------------- | --------------------- |
+| `pnr` flat            | Time                           | 78 s                  | 107 s                 |
+|                       | Design area                    | 397 µm²               | 397 µm²               |
+|                       | Worst slack                    | +388.5 ps             | +372.0 ps             |
+|                       | `route_drc.rpt`                | empty                 | empty                 |
+|                       | Wire length, vias              | 9423 µm, 34818        | 9880 µm, 33938        |
+|                       | Wire length on M2 / M3 / above | 3884 / 4432 / 1104 µm | 4183 / 4345 / 1350 µm |
+|                       | Setup clock skew               | 5.9 ps                | 6.8 ps                |
+| `post-pnr-sim` flat   | Result                         | `PASSED`              | `PASSED`              |
+| `post-pnr-dpa` flat   | Total power, clock share       | 0.676 mW, 8.2 %       | 0.684 mW, 8.7 %       |
+| `pnr` `mac_n`         | Time                           | 46 s                  | 69 s                  |
+|                       | Design area                    | 365 µm²               | 365 µm²               |
+|                       | Worst slack                    | +593.7 ps             | +551.7 ps             |
+|                       | `route_drc.rpt`                | empty                 | empty                 |
+|                       | Wire length                    | 9603 µm               | 10114 µm              |
+|                       | Abstract obstructions          | M1–M5                 | M1–M4                 |
+|                       | Power pins, top-edge pins      | M5, M5                | M4, M3                |
+| `pnr` parent          | Time                           | 72 s                  | 133 s                 |
+|                       | Design area                    | 1220 µm²              | 1220 µm²              |
+|                       | Worst slack                    | +410.8 ps             | +369.2 ps             |
+|                       | `route_drc.rpt`                | empty                 | empty                 |
+|                       | Wire length                    | 1755 µm               | 1881 µm               |
+| `post-pnr-sim` parent | Result                         | `PASSED`              | `PASSED`              |
+| `post-pnr-dpa` parent | Total power, `mac_n_i`         | 0.770, 0.500 mW       | 0.780, 0.505 mW       |
 
-The design is far too small to fill either stack, so both route clean and the areas are identical: what this comparison proves is that every file of the new stack works, in the flat and in the hierarchical flow, not how much routing capacity it has. The differences that do show are the expected ones. Placement is routability-driven and sees fewer tracks, so it spreads the cells a little differently, which costs 1 to 4 % of wire length and 20 to 40 ps of slack on a path of about one nanosecond. Detailed routing starts from more violations (476 against 342 in the flat run) and takes 1.5 to 2 times as long to clear them; most of the extra ones are line-end violations on M2 and M3, the likely cause being that M3 at 44 nm no longer lines up with the 36 nm grid of the two layers below it. Power moves by less than one percent, since it is set by the cells. The block run is the one place where capacity already binds: with M2 to M4 only, the global router needs overflow iterations, and while it reroutes nets in its second pass the log fills with `EST-0026 Missing route to pin` warnings from the parasitics estimator. They are transient; the pass ends with every net routed.
+The design is far too small to fill either stack, so both route clean and the areas are identical: what this comparison proves is that every file of the new stack works, in the flat and in the hierarchical flow, not how much routing capacity it has. The differences that do show are the expected ones. Placement is routability-driven and sees fewer tracks, so it spreads the cells a little differently, which costs 5 to 7 % of wire length and 15 to 45 ps of slack on a path of about one nanosecond. Detailed routing starts from more violations (626 against 468 in the flat run) and takes 1.5 to 2 times as long to clear them; most of the extra ones are line-end violations on M2 and M3, the likely cause being that M3 at 44 nm no longer lines up with the 36 nm grid of the two layers below it. Power moves by about one percent, since it is set by the cells. The block run is the one place where capacity already binds: with M2 to M4 only, the global router needs overflow iterations, and while it reroutes nets in its second pass the log fills with `EST-0026 Missing route to pin` warnings from the parasitics estimator. They are transient; the pass ends with every net routed.
 
 ### Cleanup
 
